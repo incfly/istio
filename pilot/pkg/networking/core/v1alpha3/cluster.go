@@ -108,6 +108,7 @@ func (configgen *ConfigGeneratorImpl) buildOutboundClusters(env *model.Environme
 
 	for _, service := range push.Services {
 		config := push.DestinationRule(service.Hostname)
+		hostname := string(service.Hostname)
 		for _, port := range service.Ports {
 			if port.Protocol == model.ProtocolUDP {
 				continue
@@ -144,6 +145,9 @@ func (configgen *ConfigGeneratorImpl) buildOutboundClusters(env *model.Environme
 					}
 					clusters = append(clusters, subsetCluster)
 				}
+			} else if push.MTLSReadyChecker(hostname){
+				tls := buildIstioMutualTLS(upstreamServiceAccounts, hostname)
+				applyUpstreamTLSSettings(defaultCluster, tls, env.Mesh.SdsUdsPath)
 			}
 
 			// call plugins for the default cluster

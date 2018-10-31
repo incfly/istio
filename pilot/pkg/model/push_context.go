@@ -85,6 +85,10 @@ type PushContext struct {
 	// ServiceAccounts is a function mapping service name to service accounts.
 	ServiceAccounts func(string) []string `json:"-"`
 
+	// MTLSReadyChecker is a function mapping from service name to a boolean which indicates whether
+	// the service is ready to receive Istio mTLS traffic.
+	MTLSReadyChecker func(string)bool `json:"-"`
+
 	// ServicePort2Name is used to keep track of service name and port mapping.
 	// This is needed because ADS names use port numbers, while endpoints use
 	// port names. The key is the service name. If a service or port are not found,
@@ -93,7 +97,6 @@ type PushContext struct {
 
 	initDone bool
 }
-
 // XDSUpdater is used for direct updates of the xDS model and incremental push.
 // Pilot uses multiple registries - for example each K8S cluster is a registry instance,
 // as well as consul and future EDS or MCP sources. Each registry is responsible for

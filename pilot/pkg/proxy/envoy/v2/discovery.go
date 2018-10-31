@@ -199,9 +199,9 @@ type EndpointShardsByService struct {
 	// CDS is updated.
 	ServiceAccounts map[string]bool
 
-	// autoMTLSEnabled is true if all the endpoints having annotations authentication.istio.io/able_mtls: true
+	// MTLSReady is true if all the endpoints having annotations authentication.istio.io/able_mtls: true
 	// This is used for Pilot mTLS autopilot.
-	autoMTLSEnabled bool
+	MTLSReady bool
 }
 
 // UpdateShard updates the endpoints for a shard, returns if this should trigger a full config push.
@@ -210,7 +210,7 @@ type EndpointShardsByService struct {
 // - Endpoint Annotations for mTLS autopilot changes, this require CDS Push to update outbound TLS Settings.
 func (eps *EndpointShardsByService) UpdateShard(shard string, endpoints []*model.IstioEndpoint) bool {
 	full := false
-	autoMTLS := true
+	mtlsEnabled := true
 	es := &EndpointShard{
 		Shard: shard,
 		Entries: []*model.IstioEndpoint{},
@@ -221,14 +221,23 @@ func (eps *EndpointShardsByService) UpdateShard(shard string, endpoints []*model
 			full = true
 		}
 		if val, exists := ep.Labels["authentication.istio.io/able_mtls"]; !exists || val != "true" {
-			autoMTLS = false
+			mtlsEnabled = false
 		}
 		es.Entries = append(es.Entries, ep)
 	}
-	if autoMTLS != eps.autoMTLSEnabled {
+	es.MTLSReady = mtlsEnabled
+	eps.Shards[shard] = es
+	mtlsReady := true
+	for _, es := range eps.Shards {
+		if !es.MTLSReady {
+			mtlsReady = false
+			break
+		}
+	}
+	if mtlsReady != eps.MTLSReady {
 		full = true
 	}
-	eps.Shards[shard] = es
+	eps.MTLSReady = mtlsReady
 	return full
 }
 
@@ -236,8 +245,9 @@ func (eps *EndpointShardsByService) UpdateShard(shard string, endpoints []*model
 // Shards are updated atomically by registries. A registry may split a service into
 // multiple shards (for example each deployment, or smaller sub-sets).
 type EndpointShard struct {
-	Shard   string
-	Entries []*model.IstioEndpoint
+	Shard     string
+	Entries   []*model.IstioEndpoint
+	MTLSReady bool
 }
 
 // Workload has the minimal info we need to detect if we need to push workloads, and to
@@ -384,6 +394,7 @@ func (s *DiscoveryServer) Push(full bool, edsUpdates map[string]*EndpointShardsB
 	t0 := time.Now()
 	push := model.NewPushContext()
 	push.ServiceAccounts = s.ServiceAccounts
+	push.MTLSReadyChecker = s.MTLSReadyChecker
 	err := push.InitContext(s.Env)
 	if err != nil {
 		adsLog.Errorf("XDS: failed to update services %v", err)
@@ -459,6 +470,17 @@ func (s *DiscoveryServer) ServiceAccounts(serviceName string) []string {
 	}
 
 	return sa
+}
+
+// MTLSReadyChecker returns true if a service exists and is ready to receive mTLS traffic.
+func (s *DiscoveryServer) MTLSReadyChecker(serviceName string) bool {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	ep, exists := s.EndpointShardsByService[serviceName]
+	if !exists {
+		return false
+	}
+	return ep.MTLSReady
 }
 
 // Returns the global push context.

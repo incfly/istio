@@ -494,14 +494,6 @@ func (s *DiscoveryServer) EDSUpdate(shard, serviceName string,
 	return s.edsUpdate(shard, serviceName, entries, false)
 }
 
-// requireFullPush returns true if the endpoints change requires a full push. This can
-// - ServiceAccounts changes for a service, CDS require new secure naming information.
-// - Some endpoints
-func requireFullPush(entries []*model.IstioEndpoint) bool {
-
-	return false
-}
-
 func (s *DiscoveryServer) edsUpdate(shard, serviceName string,
 	entries []*model.IstioEndpoint, internal bool) error {
 	// edsShardUpdate replaces a subset (shard) of endpoints, as result of an incremental
