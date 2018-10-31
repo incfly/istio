@@ -20,6 +20,8 @@ import (
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pkg/test/env"
 	"istio.io/istio/tests/util"
+	"time"
+	"fmt"
 )
 
 func TestCDS(t *testing.T) {
@@ -56,30 +58,44 @@ func TestCDS(t *testing.T) {
 }
 
 
-func TestAutoMTLSCDS(t *testing.T) {
+// TestAutoMtlsCDS tests the auto mtls feature. If a service consists of an endpoints all have
+// mtls_ready label, we configure the Cluster's TLS settings to be tls.
+func TestAutoMtlsCDS(t *testing.T) {
 	initLocalPilotTestEnv(t)
+	adsc := adsConnectAndWait(t, 0x0a0a0a0a)
+	server := util.MockTestServer
+	defer adsc.Close()
 
-	cdsr, err := connectADS(util.MockPilotGrpcAddr)
-	if err != nil {
-		t.Fatal(err)
+	endpoints := []*model.IstioEndpoint{
+		newEndpointWithAccount("127.0.0.1", "sa1", "v1"),
+		newEndpointWithAccount("127.0.0.2", "sa1", "v1"),
 	}
 
-	err = sendCDSReq(sidecarId(app3Ip, "app3"), cdsr)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	res, err := cdsr.Recv()
-	if err != nil {
-		t.Fatal("Failed to receive CDS", err)
-		return
-	}
-
-	strResponse, _ := model.ToJSONWithIndent(res, " ")
-	_ = ioutil.WriteFile(env.IstioOut+"/cdsv2_sidecar.json", []byte(strResponse), 0644)
-
-	t.Log("CDS response", strResponse)
-	if len(res.Resources) == 0 {
-		t.Fatal("No response")
-	}
+	server.EnvoyXdsServer.MemRegistry.SetEndpoints("cds.test.svc.cluster.local", endpoints)
+	adsc.WaitClear()
+	adsc.Wait("", time.Second*5)
+	fmt.Println("jianfeih debug cluster is ", adsc.Clusters)
+	//cdsr, err := connectADS(util.MockPilotGrpcAddr)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//
+	//err = sendCDSReq(sidecarId(app3Ip, "app3"), cdsr)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//
+	//res, err := cdsr.Recv()
+	//if err != nil {
+	//	t.Fatal("Failed to receive CDS", err)
+	//	return
+	//}
+	//
+	//strResponse, _ := model.ToJSONWithIndent(res, " ")
+	//_ = ioutil.WriteFile(env.IstioOut+"/cdsv2_sidecar.json", []byte(strResponse), 0644)
+	//
+	//t.Log("CDS response", strResponse)
+	//if len(res.Resources) == 0 {
+	//	t.Fatal("No response")
+	//}
 }
