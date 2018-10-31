@@ -291,6 +291,11 @@ func initLocalPilotTestEnv(t *testing.T) *bootstrap.Server {
 	return server
 }
 
+// addService
+func addService(s *bootstrap.Server, hostname string, instances []string) {
+
+}
+
 func testPorts(base int) []*model.Port {
 	return []*model.Port{
 		{

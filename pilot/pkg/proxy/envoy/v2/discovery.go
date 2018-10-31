@@ -198,6 +198,38 @@ type EndpointShardsByService struct {
 	// Due to the larger time, it is still possible that connection errors will occur while
 	// CDS is updated.
 	ServiceAccounts map[string]bool
+
+	// autoMTLSEnabled is true if all the endpoints having annotations authentication.istio.io/able_mtls: true
+	// This is used for Pilot mTLS autopilot.
+	autoMTLSEnabled bool
+}
+
+// UpdateShard updates the endpoints for a shard, returns if this should trigger a full config push.
+// Full push can happen for different reasons. For example,
+// - ServiceAccounts backed this service changed, this require CDS TLS ValidationContext change.
+// - Endpoint Annotations for mTLS autopilot changes, this require CDS Push to update outbound TLS Settings.
+func (eps *EndpointShardsByService) UpdateShard(shard string, endpoints []*model.IstioEndpoint) bool {
+	full := false
+	autoMTLS := true
+	es := &EndpointShard{
+		Shard: shard,
+		Entries: []*model.IstioEndpoint{},
+	}
+	for _, ep := range endpoints {
+		// Find endpoint associated with service accounts not seen before, require a full push.
+		if _, exists := eps.ServiceAccounts[ep.ServiceAccount]; !exists {
+			full = true
+		}
+		if val, exists := ep.Labels["authentication.istio.io/able_mtls"]; !exists || val != "true" {
+			autoMTLS = false
+		}
+		es.Entries = append(es.Entries, ep)
+	}
+	if autoMTLS != eps.autoMTLSEnabled {
+		full = true
+	}
+	eps.Shards[shard] = es
+	return full
 }
 
 // EndpointShard contains all the endpoints for a single shard (subset) of a service.
