@@ -32,6 +32,7 @@ import (
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/util"
 	"istio.io/istio/pilot/pkg/serviceregistry/aggregate"
+	"fmt"
 )
 
 // EDS returns the list of endpoints (IP:port and in future labels) associated with a real
@@ -521,6 +522,7 @@ func (s *DiscoveryServer) edsUpdate(shard, serviceName string,
 		}
 	}
 
+	fmt.Println("service name is ", serviceName)
 	full := ep.UpdateShard(shard, entries)
 	if full && !internal {
 		s.ConfigUpdate(true)

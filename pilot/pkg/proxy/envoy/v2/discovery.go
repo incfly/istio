@@ -28,6 +28,7 @@ import (
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/core"
 	"istio.io/istio/pkg/features/pilot"
+	"fmt"
 )
 
 var (
@@ -210,7 +211,7 @@ type EndpointShardsByService struct {
 // - Endpoint Annotations for mTLS autopilot changes, this require CDS Push to update outbound TLS Settings.
 func (eps *EndpointShardsByService) UpdateShard(shard string, endpoints []*model.IstioEndpoint) bool {
 	full := false
-	mtlsEnabled := true
+	shardMtlsReady := true
 	es := &EndpointShard{
 		Shard: shard,
 		Entries: []*model.IstioEndpoint{},
@@ -221,11 +222,11 @@ func (eps *EndpointShardsByService) UpdateShard(shard string, endpoints []*model
 			full = true
 		}
 		if val, exists := ep.Labels["authentication.istio.io/mtls_ready"]; !exists || val != "true" {
-			mtlsEnabled = false
+			shardMtlsReady = false
 		}
 		es.Entries = append(es.Entries, ep)
 	}
-	es.MTLSReady = mtlsEnabled
+	es.MTLSReady = shardMtlsReady
 	eps.Shards[shard] = es
 	mtlsReady := true
 	for _, es := range eps.Shards {
@@ -234,7 +235,9 @@ func (eps *EndpointShardsByService) UpdateShard(shard string, endpoints []*model
 			break
 		}
 	}
+	//fmt.Println("jianfeih debug mtlsReady ", mtlsReady, eps.MTLSReady)
 	if mtlsReady != eps.MTLSReady {
+		fmt.Println("jianfeih flip happened!", mtlsReady, eps.MTLSReady)
 		full = true
 	}
 	eps.MTLSReady = mtlsReady
@@ -403,6 +406,7 @@ func (s *DiscoveryServer) Push(full bool, edsUpdates map[string]*EndpointShardsB
 		return
 	}
 
+	fmt.Println("jianfeih debug, push happended ", full)
 	if err = s.ConfigGenerator.BuildSharedPushState(s.Env, push); err != nil {
 		adsLog.Errorf("XDS: Failed to rebuild share state in configgen: %v", err)
 		totalXDSInternalErrors.Add(1)
@@ -480,6 +484,7 @@ func (s *DiscoveryServer) MTLSReadyChecker(serviceName string) bool {
 	if !exists {
 		return false
 	}
+
 	return ep.MTLSReady
 }
 

@@ -146,6 +146,7 @@ func (configgen *ConfigGeneratorImpl) buildOutboundClusters(env *model.Environme
 					clusters = append(clusters, subsetCluster)
 				}
 			} else if push.MTLSReadyChecker(hostname){
+				fmt.Println("jianfeih debug checker returns true ", hostname)
 				tls := buildIstioMutualTLS(upstreamServiceAccounts, hostname)
 				applyUpstreamTLSSettings(defaultCluster, tls, env.Mesh.SdsUdsPath)
 			}

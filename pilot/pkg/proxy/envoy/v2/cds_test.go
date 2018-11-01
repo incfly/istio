@@ -85,23 +85,24 @@ func TestAutoMtlsCDS(t *testing.T) {
 	}
 
 	adsc.WaitClear()
-	adsc.Wait("", time.Second*5)
+	adsc.Wait("cds", time.Second*5)
 	tlsChecker()
 
 	// Now adds an IstioEndpoint with annotation, should still see TLS settings.
-	epNew := newEndpointWithAccount("127.0.0.3", "sa1", "v1")
-	epNew.Labels["authentication.istio.io/mtls_ready"] = "true"
-	endpoints = append(endpoints, epNew)
-	server.EnvoyXdsServer.MemRegistry.SetEndpoints(svcName, endpoints)
+	//epNew := newEndpointWithAccount("127.0.0.3", "sa1", "v1")
+	//epNew.Labels["authentication.istio.io/mtls_ready"] = "true"
+	//endpoints = append(endpoints, epNew)
+	//server.EnvoyXdsServer.MemRegistry.SetEndpoints(svcName, endpoints)
+	//
+	//adsc.Wait("cds", time.Second*5)
+	//tlsChecker()
 
-	adsc.Wait("", time.Second*5)
-	tlsChecker()
-
+	fmt.Println("jianfeih debug add un annodated endpoint")
 	// Add an endpoint without annotation, expect to see cluster without TLS settings.
 	epNotReady := newEndpointWithAccount("127.0.0.4", "sa1", "v1")
 	endpoints = append(endpoints, epNotReady)
 	server.EnvoyXdsServer.MemRegistry.SetEndpoints(svcName, endpoints)
 
-	adsc.Wait("", time.Second*5)
+	adsc.Wait("cds", time.Second*5)
 	tlsChecker()
 }
