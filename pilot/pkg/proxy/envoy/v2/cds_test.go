@@ -20,8 +20,8 @@ import (
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pkg/test/env"
 	"istio.io/istio/tests/util"
-	"time"
 	"fmt"
+	"time"
 )
 
 func TestCDS(t *testing.T) {
@@ -70,32 +70,38 @@ func TestAutoMtlsCDS(t *testing.T) {
 		newEndpointWithAccount("127.0.0.1", "sa1", "v1"),
 		newEndpointWithAccount("127.0.0.2", "sa1", "v1"),
 	}
+	for _, ep := range endpoints {
+		ep.Labels["authentication.istio.io/mtls_ready"] = "true"
+	}
+	svcName := "cds.test.svc.cluster.local"
+	server.EnvoyXdsServer.MemRegistry.AddHTTPService(svcName, "127.0.0.1", 8000)
+	server.EnvoyXdsServer.MemRegistry.SetEndpoints(svcName, endpoints)
+	tlsChecker := func() {
+		for name, cluster := range adsc.Clusters {
+			if  name == "outbound|8000||cds.test.svc.cluster.local" {
+				fmt.Println("cluster name ", name, "\nCluster", cluster)
+			}
+		}
+	}
 
-	server.EnvoyXdsServer.MemRegistry.SetEndpoints("cds.test.svc.cluster.local", endpoints)
 	adsc.WaitClear()
 	adsc.Wait("", time.Second*5)
-	fmt.Println("jianfeih debug cluster is ", adsc.Clusters)
-	//cdsr, err := connectADS(util.MockPilotGrpcAddr)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//
-	//err = sendCDSReq(sidecarId(app3Ip, "app3"), cdsr)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//
-	//res, err := cdsr.Recv()
-	//if err != nil {
-	//	t.Fatal("Failed to receive CDS", err)
-	//	return
-	//}
-	//
-	//strResponse, _ := model.ToJSONWithIndent(res, " ")
-	//_ = ioutil.WriteFile(env.IstioOut+"/cdsv2_sidecar.json", []byte(strResponse), 0644)
-	//
-	//t.Log("CDS response", strResponse)
-	//if len(res.Resources) == 0 {
-	//	t.Fatal("No response")
-	//}
+	tlsChecker()
+
+	// Now adds an IstioEndpoint with annotation, should still see TLS settings.
+	epNew := newEndpointWithAccount("127.0.0.3", "sa1", "v1")
+	epNew.Labels["authentication.istio.io/mtls_ready"] = "true"
+	endpoints = append(endpoints, epNew)
+	server.EnvoyXdsServer.MemRegistry.SetEndpoints(svcName, endpoints)
+
+	adsc.Wait("", time.Second*5)
+	tlsChecker()
+
+	// Add an endpoint without annotation, expect to see cluster without TLS settings.
+	epNotReady := newEndpointWithAccount("127.0.0.4", "sa1", "v1")
+	endpoints = append(endpoints, epNotReady)
+	server.EnvoyXdsServer.MemRegistry.SetEndpoints(svcName, endpoints)
+
+	adsc.Wait("", time.Second*5)
+	tlsChecker()
 }

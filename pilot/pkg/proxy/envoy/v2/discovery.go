@@ -220,7 +220,7 @@ func (eps *EndpointShardsByService) UpdateShard(shard string, endpoints []*model
 		if _, exists := eps.ServiceAccounts[ep.ServiceAccount]; !exists {
 			full = true
 		}
-		if val, exists := ep.Labels["authentication.istio.io/able_mtls"]; !exists || val != "true" {
+		if val, exists := ep.Labels["authentication.istio.io/mtls_ready"]; !exists || val != "true" {
 			mtlsEnabled = false
 		}
 		es.Entries = append(es.Entries, ep)
