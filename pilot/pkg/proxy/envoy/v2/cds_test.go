@@ -22,6 +22,7 @@ import (
 	"istio.io/istio/tests/util"
 	"fmt"
 	"time"
+	"istio.io/istio/pkg/adsc"
 )
 
 func TestCDS(t *testing.T) {
@@ -62,9 +63,7 @@ func TestCDS(t *testing.T) {
 // mtls_ready label, we configure the Cluster's TLS settings to be tls.
 func TestAutoMtlsCDS(t *testing.T) {
 	initLocalPilotTestEnv(t)
-	adsc := adsConnectAndWait(t, 0x0a0a0a0a)
 	server := util.MockTestServer
-	defer adsc.Close()
 
 	endpoints := []*model.IstioEndpoint{
 		newEndpointWithAccount("127.0.0.1", "sa1", "v1"),
@@ -74,9 +73,19 @@ func TestAutoMtlsCDS(t *testing.T) {
 		ep.Labels["authentication.istio.io/mtls_ready"] = "true"
 	}
 	svcName := "cds.test.svc.cluster.local"
-	server.EnvoyXdsServer.MemRegistry.AddHTTPService(svcName, "127.0.0.1", 8000)
+	server.EnvoyXdsServer.MemRegistry.AddHTTPService(svcName, "10.0.0.1", 8000)
 	server.EnvoyXdsServer.MemRegistry.SetEndpoints(svcName, endpoints)
+
+	adsc, err := adsc.Dial(util.MockPilotGrpcAddr, "", &adsc.Config{
+		IP: testIp(uint32(0x0a0a0a0a)),
+	})
+	if err != nil {
+		t.Fatal("Error connecting ", err)
+	}
+	defer adsc.Close()
+
 	tlsChecker := func() {
+		adsc.Wait("cds", time.Second*5)
 		for name, cluster := range adsc.Clusters {
 			if  name == "outbound|8000||cds.test.svc.cluster.local" {
 				fmt.Println("cluster name ", name, "\nCluster", cluster)
@@ -84,8 +93,8 @@ func TestAutoMtlsCDS(t *testing.T) {
 		}
 	}
 
-	adsc.WaitClear()
-	adsc.Wait("cds", time.Second*5)
+	fmt.Println("jianfeih debug, first endpoints setup done")
+	adsc.Watch()
 	tlsChecker()
 
 	// Now adds an IstioEndpoint with annotation, should still see TLS settings.
@@ -97,12 +106,11 @@ func TestAutoMtlsCDS(t *testing.T) {
 	//adsc.Wait("cds", time.Second*5)
 	//tlsChecker()
 
-	fmt.Println("jianfeih debug add un annodated endpoint")
+	fmt.Println("jianfeih debug added un annodated endpoint")
 	// Add an endpoint without annotation, expect to see cluster without TLS settings.
 	epNotReady := newEndpointWithAccount("127.0.0.4", "sa1", "v1")
 	endpoints = append(endpoints, epNotReady)
 	server.EnvoyXdsServer.MemRegistry.SetEndpoints(svcName, endpoints)
 
-	adsc.Wait("cds", time.Second*5)
 	tlsChecker()
 }

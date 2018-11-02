@@ -349,7 +349,7 @@ func (a *ADSC) handleLDS(ll []*xdsapi.Listener) {
 }
 
 func (a *ADSC) handleCDS(ll []*xdsapi.Cluster) {
-
+	fmt.Println("jianfeih debug handle CDS happended")
 	cn := []string{}
 	cdsSize := 0
 	cds := map[string]*xdsapi.Cluster{}
