@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 	"istio.io/istio/pkg/adsc"
+	"strconv"
 )
 
 func TestCDS(t *testing.T) {
@@ -67,6 +68,68 @@ func TestAutoMtlsCDS(t *testing.T) {
 	initLocalPilotTestEnv(t)
 	server := util.MockTestServer
 
+	svcName := "cds.test.svc.cluster.local"
+	server.EnvoyXdsServer.MemRegistry.AddHTTPService(svcName, "10.0.0.1", 8000)
+	creatEndpoint := func(ip string, mtlsReady bool) *model.IstioEndpoint {
+		return &model.IstioEndpoint{
+			Address:         ip,
+			ServicePortName: "http-main",
+			EndpointPort:    80,
+			Labels:          map[string]string{
+				"authentication.istio.io/mtls_ready": strconv.FormatBool(mtlsReady),
+			},
+			UID:             "uid1",
+			ServiceAccount:  "sa-bar",
+		}
+	}
+
+	testCases := []struct {
+		name string
+		endpoints []*model.IstioEndpoint
+		wantTLS bool
+	} {
+		{
+			name: "TwoEndpointMtlsReady",
+			endpoints: []*model.IstioEndpoint{
+				creatEndpoint("127.0.0.1", true),
+				creatEndpoint("127.0.0.2", true),
+	    },
+	    wantTLS: true,
+		},
+		{
+			name: "ThreeEndpointMtlsNotReady",
+			endpoints: []*model.IstioEndpoint{
+				creatEndpoint("127.0.0.1", true),
+				creatEndpoint("127.0.0.2", true),
+				creatEndpoint("127.0.0.3", false),
+			},
+			wantTLS: false,
+		},
+		{
+			name: "TwoEndpointMtlsReadyAgain",
+			endpoints: []*model.IstioEndpoint{
+				creatEndpoint("127.0.0.1", true),
+				creatEndpoint("127.0.0.2", true),
+			},
+			wantTLS: true,
+		},
+		{
+			name: "ThreeEndpointMtlsReady",
+			endpoints: []*model.IstioEndpoint{
+				creatEndpoint("127.0.0.1", true),
+				creatEndpoint("127.0.0.2", true),
+				creatEndpoint("127.0.0.3", true),
+			},
+			wantTLS: true,
+		},
+		// TODO: more test cases to cover DestinationRule takes priority over this one.
+	}
+
+	for i, tc := range testCases {
+		fmt.Println("testing ", i, tc)
+	}
+
+
 	endpoints := []*model.IstioEndpoint{
 		newEndpointWithAccount("127.0.0.1", "sa1", "v1"),
 		newEndpointWithAccount("127.0.0.2", "sa1", "v1"),
@@ -74,8 +137,6 @@ func TestAutoMtlsCDS(t *testing.T) {
 	for _, ep := range endpoints {
 		ep.Labels["authentication.istio.io/mtls_ready"] = "true"
 	}
-	svcName := "cds.test.svc.cluster.local"
-	server.EnvoyXdsServer.MemRegistry.AddHTTPService(svcName, "10.0.0.1", 8000)
 	server.EnvoyXdsServer.MemRegistry.SetEndpoints(svcName, endpoints)
 
 	adsc, err := adsc.Dial(util.MockPilotGrpcAddr, "", &adsc.Config{
