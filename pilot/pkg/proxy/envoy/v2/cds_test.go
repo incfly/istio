@@ -70,6 +70,24 @@ func TestAutoMtlsCDS(t *testing.T) {
 
 	svcName := "cds.test.svc.cluster.local"
 	server.EnvoyXdsServer.MemRegistry.AddHTTPService(svcName, "10.0.0.1", 8000)
+
+	adsc, err := adsc.Dial(util.MockPilotGrpcAddr, "", &adsc.Config{
+		IP: testIp(uint32(0x0a0a0a0a)),
+	})
+	if err != nil {
+		t.Fatal("Error connecting ", err)
+	}
+	defer adsc.Close()
+
+	tlsChecker := func() {
+		adsc.Wait("cds", time.Second*5)
+		for name, cluster := range adsc.Clusters {
+			if  name == "outbound|8000||cds.test.svc.cluster.local" {
+				fmt.Println("jianfeih debug cluster name ", name, " Cluster", cluster)
+			}
+		}
+	}
+
 	creatEndpoint := func(ip string, mtlsReady bool) *model.IstioEndpoint {
 		return &model.IstioEndpoint{
 			Address:         ip,
@@ -126,7 +144,10 @@ func TestAutoMtlsCDS(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		fmt.Println("testing ", i, tc)
+		fmt.Println("jianfeih debug testing ", i, tc.name)
+		//server.EnvoyXdsServer.MemRegistry.SetEndpoints(svcName, tc.endpoints)
+		//adsc.Watch()
+		//tlsChecker()
 	}
 
 
@@ -138,23 +159,6 @@ func TestAutoMtlsCDS(t *testing.T) {
 		ep.Labels["authentication.istio.io/mtls_ready"] = "true"
 	}
 	server.EnvoyXdsServer.MemRegistry.SetEndpoints(svcName, endpoints)
-
-	adsc, err := adsc.Dial(util.MockPilotGrpcAddr, "", &adsc.Config{
-		IP: testIp(uint32(0x0a0a0a0a)),
-	})
-	if err != nil {
-		t.Fatal("Error connecting ", err)
-	}
-	defer adsc.Close()
-
-	tlsChecker := func() {
-		adsc.Wait("cds", time.Second*5)
-		for name, cluster := range adsc.Clusters {
-			if  name == "outbound|8000||cds.test.svc.cluster.local" {
-				fmt.Println("cluster name ", name, "\nCluster", cluster)
-			}
-		}
-	}
 
 	fmt.Println("jianfeih debug, first endpoints setup done")
 	adsc.Watch()
