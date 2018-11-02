@@ -61,6 +61,8 @@ func TestCDS(t *testing.T) {
 
 // TestAutoMtlsCDS tests the auto mtls feature. If a service consists of an endpoints all have
 // mtls_ready label, we configure the Cluster's TLS settings to be tls.
+// TODO: TestEnvoy fails because local envoy unable to load `/etc/certs/` path. Solution can be make that configurable
+// discovery request thus to do dependency injection.
 func TestAutoMtlsCDS(t *testing.T) {
 	initLocalPilotTestEnv(t)
 	server := util.MockTestServer
