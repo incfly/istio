@@ -207,8 +207,8 @@ type EndpointShardsByService struct {
 
 // UpdateShard updates the endpoints for a shard, returns if this should trigger a full config push.
 // Full push can happen for different reasons. For example,
-// - ServiceAccounts backed this service changed, this require CDS TLS ValidationContext change.
-// - Endpoint Annotations for mTLS autopilot changes, this require CDS Push to update outbound TLS Settings.
+// - ServiceAccounts of this service changed, this require CDS TLS ValidationContext change.
+// - Endpoint Annotations for mTLS autopilot changes, this require full CDS push to update outbound TLS Settings.
 func (eps *EndpointShardsByService) UpdateShard(servicename, shard string, endpoints []*model.IstioEndpoint) bool {
 	full := false
 	shardMtlsReady := true
@@ -236,13 +236,13 @@ func (eps *EndpointShardsByService) UpdateShard(servicename, shard string, endpo
 		}
 	}
 	if mtlsReady != eps.MTLSReady {
-		if servicename == "cds.test.svc.cluster.local" {
-			fmt.Printf("jianfeih debug service name %v flip before %v, after %v\n", servicename, eps.MTLSReady, mtlsReady)
-			for _, ep := range endpoints {
-				fmt.Printf("%v ", ep.Address)
-			}
-			fmt.Println("")
-		}
+		//if servicename == "cds.test.svc.cluster.local" {
+			//fmt.Printf("jianfeih debug service name %v flip before %v, after %v\n", servicename, eps.MTLSReady, mtlsReady)
+			//for _, ep := range endpoints {
+			//	fmt.Printf("%v ", ep.Address)
+			//}
+			//fmt.Println("")
+		//}
 		full = true
 	}
 	eps.MTLSReady = mtlsReady
