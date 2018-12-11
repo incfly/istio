@@ -779,6 +779,22 @@ func TestHelmInject(t *testing.T) {
 	}
 }
 
+func TestProbeRewrite(t *testing.T) {
+	inputYAML, _ := ioutil.ReadFile("testdata/webhook/probe-rewrite.yaml")
+	inputJSON := yamlToJSON(inputYAML, t)
+	// _, err := ioutil.ReadFile("probe-rewrite.yaml.injected")
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+	patch, err := ioutil.ReadFile("testdata/webhook/probe-rewrite.patch")
+	if err != nil {
+		t.Error(err)
+	}
+	patch = prettyJSON(patch, t)
+	patched := applyJSONPatch(inputJSON, patch, t)
+	fmt.Println("patched\n", string(patched))
+}
+
 func createTestWebhook(sidecarTemplate string) *Webhook {
 	mesh := model.DefaultMeshConfig()
 	return &Webhook{
@@ -868,6 +884,7 @@ func getHelmValues(t *testing.T) string {
 func splitYamlFile(yamlFile string, t *testing.T) [][]byte {
 	t.Helper()
 	yamlBytes := util.ReadFile(yamlFile, t)
+	// fmt.Println("yamlBytes jianfeih debug ", string(yamlBytes))
 	return splitYamlBytes(yamlBytes, t)
 }
 
@@ -878,9 +895,9 @@ func splitYamlBytes(yaml []byte, t *testing.T) [][]byte {
 	for _, stringPart := range stringParts {
 		byteParts = append(byteParts, getInjectableYamlDocs(stringPart, t)...)
 	}
-	if len(byteParts) == 0 {
-		t.Skip("Found no injectable parts")
-	}
+	// if len(byteParts) == 0 {
+	// 	t.Skip("Found no injectable parts")
+	// }
 	return byteParts
 }
 
