@@ -162,6 +162,7 @@ func (d *driver) Requires(t testing.TB, dependencies []dependency.Instance) {
 	// Initialize dependencies only once.
 	for _, dep := range dependencies {
 		envID := d.context.Settings().Environment
+		fmt.Println("jianfieh debug dependency ", dep, envID)
 
 		switch dep {
 		case dependency.Local:

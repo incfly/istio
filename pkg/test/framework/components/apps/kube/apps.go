@@ -127,6 +127,22 @@ var (
 			headless:       true,
 			serviceAccount: true,
 		},
+		// TODO(incfly): ideally the test should declare the deployments content and associate it with
+		// meaningful names for maintaience reason.
+		{
+			deployment:     "http-probe-rewrite",
+			service:        "http-probe-rewrite",
+			version:        "unversioned",
+			port1:          80,
+			port2:          8080,
+			port3:          90,
+			port4:          9090,
+			port5:          70,
+			port6:          7070,
+			injectProxy:    false,
+			kubeInject:     true,
+			serviceAccount: true,
+		},
 	}
 )
 
@@ -154,7 +170,9 @@ func (c *kubeComponent) Init(ctx environment.ComponentContext, deps map[dependen
 
 	// Apply all the configs for the deployments.
 	for _, d := range deployments {
+		fmt.Println("jianfeih debug the deployment is ", d.deployment)
 		if err := d.apply(e); err != nil {
+			fmt.Printf("jianfeih debug the error occurred %v\n", err)
 			return nil, multierror.Prefix(err, fmt.Sprintf("failed deploying %s: ", d.deployment))
 		}
 	}

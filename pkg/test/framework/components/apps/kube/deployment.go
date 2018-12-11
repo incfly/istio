@@ -16,12 +16,15 @@ package kube
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path"
 	"strconv"
 
 	kubeApiCore "k8s.io/api/core/v1"
 
 	"istio.io/istio/pkg/test/framework/environments/kubernetes"
 	"istio.io/istio/pkg/test/framework/tmpl"
+	"istio.io/istio/tests/e2e/framework"
 )
 
 const (
@@ -142,16 +145,19 @@ spec:
 )
 
 type deployment struct {
-	deployment     string
-	service        string
-	version        string
-	port1          int
-	port2          int
-	port3          int
-	port4          int
-	port5          int
-	port6          int
-	injectProxy    bool
+	deployment  string
+	service     string
+	version     string
+	port1       int
+	port2       int
+	port3       int
+	port4       int
+	port5       int
+	port6       int
+	injectProxy bool
+	// by default deployment uses webhook auto inject. If `kubeInject` is true
+	// we run `istioctl kubeinject` for injection. `injectProxy` has to be false.
+	kubeInject     bool
 	headless       bool
 	serviceAccount bool
 }
@@ -179,6 +185,31 @@ func (d *deployment) apply(e *kubernetes.Implementation) error {
 	})
 	if err != nil {
 		return err
+	}
+
+	// If `kubeInject` is turned on, run `istioctl kube-inject` instead.
+	if d.kubeInject {
+		tmpdir, _ := ioutil.TempDir("", "kubeinject")
+		if d.injectProxy {
+			return fmt.Errorf("%v: injectProxy has to be off while kubeInject is enabled", d.deployment)
+		}
+
+		ictl, err := framework.NewIstioctl(tmpdir, kubernetes.DefaultIstioSystemNamespace,
+			s.Values[kubernetes.HubValuesKey], s.Values[kubernetes.TagValuesKey], s.Values[kubernetes.ImagePullPolicyValuesKey], "", s.KubeConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create istioctl instance %v", err)
+		}
+		src := path.Join(tmpdir, "src.yaml")
+		if err := ioutil.WriteFile(src, []byte(result), 0644); err != nil {
+			return fmt.Errorf("failed to dump file into file %v", err)
+		}
+		dest := path.Join(tmpdir, "destination.yaml")
+		if err = ictl.KubeInject(src, dest, s.KubeConfig); err != nil {
+			return fmt.Errorf("failed in kube-inject %v", err)
+		}
+		if err := e.Accessor.Apply(s.DependencyNamespace, dest); err != nil {
+			return err
+		}
 	}
 
 	if err = e.Accessor.ApplyContents(s.DependencyNamespace, result); err != nil {
