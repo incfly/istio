@@ -410,6 +410,9 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 
 	patch = append(patch, updateAnnotation(pod.Annotations, annotations)...)
 
+	// Rewrite the application http probe if needed.
+	patch = append(patch, createProbeRewritePatch(&pod.Spec, sic)...)
+
 	return json.Marshal(patch)
 }
 

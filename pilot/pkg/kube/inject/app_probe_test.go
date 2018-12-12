@@ -390,7 +390,7 @@ func TestRewriteAppHTTPProbe(t *testing.T) {
 	}
 	for _, tc := range tests {
 		pod := proto.Clone(tc.original).(*corev1.PodSpec)
-		rewriteAppHTTPProbe(tc.sidecar, pod)
+		rewriteAppHTTPProbe(pod, tc.sidecar)
 		if !reflect.DeepEqual(pod, tc.want) {
 			t.Errorf("[%v] failed, want %+v, got %+v", tc.name, tc.want, pod)
 		}

@@ -618,7 +618,6 @@ func TestInject(t *testing.T) {
 				},
 			})
 			var prettyPatch bytes.Buffer
-			fmt.Println("jianfeih debug got ", string(got.Patch))
 			if err := json.Indent(&prettyPatch, got.Patch, "", "  "); err != nil {
 				t.Fatalf(err.Error())
 			}

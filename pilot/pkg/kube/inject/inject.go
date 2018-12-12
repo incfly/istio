@@ -691,7 +691,7 @@ func intoObject(sidecarTemplate string, meshconfig *meshconfig.MeshConfig, in ru
 
 	// Modify application containers' HTTP probe after appending injected containers.
 	// Because we need to extract istio-proxy's statusPort.
-	rewriteAppHTTPProbe(spec, podSpec)
+	rewriteAppHTTPProbe(podSpec, spec)
 
 	if metadata.Annotations == nil {
 		metadata.Annotations = make(map[string]string)
