@@ -107,6 +107,8 @@ func calculateProbeRewrite(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec, 
 			return nil
 		}
 		httpGet := proto.Clone(probe.HTTPGet).(*corev1.HTTPGetAction)
+		// Walkaround... proto.Clone can't copy corev1.IntOrStr somehow...
+		httpGet.Port = probe.HTTPGet.Port
 		header := corev1.HTTPHeader{
 			Name:  status.IstioAppPortHeader,
 			Value: httpGet.Port.String(),

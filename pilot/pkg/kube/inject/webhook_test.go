@@ -782,24 +782,6 @@ func TestHelmInject(t *testing.T) {
 	}
 }
 
-// Mysterious why this is not generating expected output...
-func TestProbeRewrite(t *testing.T) {
-	inputYAML, _ := ioutil.ReadFile("testdata/webhook/TestWebhookInject_http_probe_rewrite.yaml")
-	inputJSON := yamlToJSON(inputYAML, t)
-	// _, err := ioutil.ReadFile("probe-rewrite.yaml.injected")
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-	patch, err := ioutil.ReadFile("testdata/webhook/TestWebhookInject_http_probe_rewrite.patch")
-	if err != nil {
-		t.Error(err)
-	}
-	patch = prettyJSON(patch, t)
-	fmt.Println("jianfeih debug ", string(inputJSON))
-	patched := applyJSONPatch(inputJSON, patch, t)
-	fmt.Println("patched\n", string(patched))
-}
-
 func createTestWebhook(sidecarTemplate string) *Webhook {
 	mesh := model.DefaultMeshConfig()
 	return &Webhook{
