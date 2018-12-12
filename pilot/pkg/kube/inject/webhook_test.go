@@ -518,82 +518,82 @@ func TestInject(t *testing.T) {
 		inputFile string
 		wantFile  string
 	}{
-		// {
-		// 	inputFile: "TestWebhookInject.yaml",
-		// 	wantFile:  "TestWebhookInject.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_initContainers.yaml",
-		// 	wantFile:  "TestWebhookInject_no_initContainers.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_containers.yaml",
-		// 	wantFile:  "TestWebhookInject_no_containers.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_volumes.yaml",
-		// 	wantFile:  "TestWebhookInject_no_volumes.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_imagePullSecrets.yaml",
-		// 	wantFile:  "TestWebhookInject_no_imagePullSecrets.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_volumes_imagePullSecrets.yaml",
-		// 	wantFile:  "TestWebhookInject_no_volumes_imagePullSecrets.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_containers_volumes_imagePullSecrets.yaml",
-		// 	wantFile:  "TestWebhookInject_no_containers_volumes_imagePullSecrets.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_containers_volumes.yaml",
-		// 	wantFile:  "TestWebhookInject_no_containers_volumes.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_containers_imagePullSecrets.yaml",
-		// 	wantFile:  "TestWebhookInject_no_containers_imagePullSecrets.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_initContainers_containers.yaml",
-		// 	wantFile:  "TestWebhookInject_no_initContainers_containers.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_initContainers_volumes.yaml",
-		// 	wantFile:  "TestWebhookInject_no_initContainers_volumes.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_initContainers_imagePullSecrets.yaml",
-		// 	wantFile:  "TestWebhookInject_no_initContainers_imagePullSecrets.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_containers_volumes_imagePullSecrets.yaml",
-		// 	wantFile:  "TestWebhookInject_no_containers_volumes_imagePullSecrets.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_initContainers_volumes_imagePullSecrets.yaml",
-		// 	wantFile:  "TestWebhookInject_no_initContainers_volumes_imagePullSecrets.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_initContainers_containers_volumes.yaml",
-		// 	wantFile:  "TestWebhookInject_no_initContainers_containers_volumes.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_initContainers_containers_imagePullSecrets.yaml",
-		// 	wantFile:  "TestWebhookInject_no_initContainers_containers_imagePullSecrets.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_no_initContainers_containers_volumes_imagePullSecrets.yaml",
-		// 	wantFile:  "TestWebhookInject_no_initcontainers_containers_volumes_imagePullSecrets.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_replace.yaml",
-		// 	wantFile:  "TestWebhookInject_replace.patch",
-		// },
-		// {
-		// 	inputFile: "TestWebhookInject_replace_backwards_compat.yaml",
-		// 	wantFile:  "TestWebhookInject_replace_backwards_compat.patch",
-		// },
+		{
+			inputFile: "TestWebhookInject.yaml",
+			wantFile:  "TestWebhookInject.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_initContainers.yaml",
+			wantFile:  "TestWebhookInject_no_initContainers.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_containers.yaml",
+			wantFile:  "TestWebhookInject_no_containers.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_volumes.yaml",
+			wantFile:  "TestWebhookInject_no_volumes.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_imagePullSecrets.yaml",
+			wantFile:  "TestWebhookInject_no_imagePullSecrets.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_volumes_imagePullSecrets.yaml",
+			wantFile:  "TestWebhookInject_no_volumes_imagePullSecrets.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_containers_volumes_imagePullSecrets.yaml",
+			wantFile:  "TestWebhookInject_no_containers_volumes_imagePullSecrets.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_containers_volumes.yaml",
+			wantFile:  "TestWebhookInject_no_containers_volumes.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_containers_imagePullSecrets.yaml",
+			wantFile:  "TestWebhookInject_no_containers_imagePullSecrets.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_initContainers_containers.yaml",
+			wantFile:  "TestWebhookInject_no_initContainers_containers.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_initContainers_volumes.yaml",
+			wantFile:  "TestWebhookInject_no_initContainers_volumes.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_initContainers_imagePullSecrets.yaml",
+			wantFile:  "TestWebhookInject_no_initContainers_imagePullSecrets.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_containers_volumes_imagePullSecrets.yaml",
+			wantFile:  "TestWebhookInject_no_containers_volumes_imagePullSecrets.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_initContainers_volumes_imagePullSecrets.yaml",
+			wantFile:  "TestWebhookInject_no_initContainers_volumes_imagePullSecrets.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_initContainers_containers_volumes.yaml",
+			wantFile:  "TestWebhookInject_no_initContainers_containers_volumes.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_initContainers_containers_imagePullSecrets.yaml",
+			wantFile:  "TestWebhookInject_no_initContainers_containers_imagePullSecrets.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_no_initContainers_containers_volumes_imagePullSecrets.yaml",
+			wantFile:  "TestWebhookInject_no_initcontainers_containers_volumes_imagePullSecrets.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_replace.yaml",
+			wantFile:  "TestWebhookInject_replace.patch",
+		},
+		{
+			inputFile: "TestWebhookInject_replace_backwards_compat.yaml",
+			wantFile:  "TestWebhookInject_replace_backwards_compat.patch",
+		},
 		{
 			inputFile: "TestWebhookInject_http_probe_rewrite.yaml",
 			wantFile:  "TestWebhookInject_http_probe_rewrite.patch",
@@ -621,9 +621,7 @@ func TestInject(t *testing.T) {
 			if err := json.Indent(&prettyPatch, got.Patch, "", "  "); err != nil {
 				t.Fatalf(err.Error())
 			}
-			fmt.Println("jianfeih debug got ", string(prettyPatch.String()))
 			util.CompareContent(prettyPatch.Bytes(), want, t)
-
 		})
 	}
 }
