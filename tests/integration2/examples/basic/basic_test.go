@@ -50,10 +50,3 @@ spec:
 	// As an example, the following method calls the Report operation against Mixer's own API directly.
 	mixer.Report(t, map[string]interface{}{})
 }
-
-func TestProbeRewrite(t *testing.T) {
-	framework.Requires(t, dependency.Apps)
-	framework.Requires(t, dependency.Pilot)
-	env := framework.AcquireEnvironment(t)
-	fmt.Println("jianfeih debug env ", env)
-}
