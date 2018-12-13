@@ -51,7 +51,7 @@ func extractStatusPort(spec *SidecarInjectionSpec) int {
 		return -1
 	}
 	if !spec.RewriteAppHTTPProbe {
-		return
+		return -1
 	}
 	statusPort := -1
 	for _, c := range spec.Containers {
