@@ -50,6 +50,9 @@ func extractStatusPort(spec *SidecarInjectionSpec) int {
 	if spec == nil {
 		return -1
 	}
+	if !spec.RewriteAppHTTPProbe {
+		return
+	}
 	statusPort := -1
 	for _, c := range spec.Containers {
 		if c.Name != istioProxyContainerName {
