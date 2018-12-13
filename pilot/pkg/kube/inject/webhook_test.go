@@ -515,8 +515,9 @@ func TestInjectRequired(t *testing.T) {
 
 func TestInject(t *testing.T) {
 	cases := []struct {
-		inputFile string
-		wantFile  string
+		inputFile    string
+		wantFile     string
+		templateFile string
 	}{
 		{
 			inputFile: "TestWebhookInject.yaml",
@@ -595,16 +596,21 @@ func TestInject(t *testing.T) {
 			wantFile:  "TestWebhookInject_replace_backwards_compat.patch",
 		},
 		{
-			inputFile: "TestWebhookInject_http_probe_rewrite.yaml",
-			wantFile:  "TestWebhookInject_http_probe_rewrite.patch",
+			inputFile:    "TestWebhookInject_http_probe_rewrite.yaml",
+			wantFile:     "TestWebhookInject_http_probe_rewrite.patch",
+			templateFile: "TestWebhookInject_http_probe_rewrite_template.yaml",
 		},
 	}
 
 	for i, c := range cases {
 		input := filepath.Join("testdata/webhook", c.inputFile)
 		want := filepath.Join("testdata/webhook", c.wantFile)
+		templateFile := "TestWebhookInject_template.yaml"
+		if c.templateFile != "" {
+			templateFile = c.templateFile
+		}
 		t.Run(fmt.Sprintf("[%d] %s", i, c.inputFile), func(t *testing.T) {
-			wh := createTestWebhookFromFile("testdata/webhook/TestWebhookInject_template.yaml", t)
+			wh := createTestWebhookFromFile(filepath.Join("testdata/webhook", templateFile), t)
 			podYAML := util.ReadFile(input, t)
 			podJSON, err := yaml.YAMLToJSON(podYAML)
 			if err != nil {
@@ -797,6 +803,7 @@ func createTestWebhook(sidecarTemplate string) *Webhook {
 func createTestWebhookFromFile(templateFile string, t *testing.T) *Webhook {
 	t.Helper()
 	sidecarTemplate := string(util.ReadFile(templateFile, t))
+	// fmt.Println("jianfeih debug sidecarTemplate ", sidecarTemplate)
 	return createTestWebhook(sidecarTemplate)
 }
 

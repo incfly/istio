@@ -15,10 +15,6 @@
       {
         "name": "istio-proxy",
         "image": "example.com/proxy:latest",
-        "args": [
-          "--statusPort",
-          "15020"
-        ],
         "resources": {}
       }
     ]
