@@ -803,7 +803,6 @@ func createTestWebhook(sidecarTemplate string) *Webhook {
 func createTestWebhookFromFile(templateFile string, t *testing.T) *Webhook {
 	t.Helper()
 	sidecarTemplate := string(util.ReadFile(templateFile, t))
-	// fmt.Println("jianfeih debug sidecarTemplate ", sidecarTemplate)
 	return createTestWebhook(sidecarTemplate)
 }
 
