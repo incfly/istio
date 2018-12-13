@@ -18,15 +18,21 @@ spec:
     spec:
       containers:
       - image: fake.docker.io/google-samples/hello-go-gke:1.0
-        livenessProbe: {}
+        livenessProbe:
+          httpGet:
+            port: http
         name: hello
         ports:
         - containerPort: 80
           name: http
-        readinessProbe: {}
+        readinessProbe:
+          httpGet:
+            port: 3333
         resources: {}
       - image: fake.docker.io/google-samples/hello-go-gke:1.0
-        livenessProbe: {}
+        livenessProbe:
+          httpGet:
+            port: http
         name: world
         ports:
         - containerPort: 90
