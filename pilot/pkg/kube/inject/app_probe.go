@@ -50,9 +50,6 @@ func extractStatusPort(spec *SidecarInjectionSpec) int {
 	if spec == nil {
 		return -1
 	}
-	if !spec.RewriteAppHTTPProbe {
-		return -1
-	}
 	statusPort := -1
 	for _, c := range spec.Containers {
 		if c.Name != istioProxyContainerName {
@@ -96,7 +93,7 @@ func extractStatusPort(spec *SidecarInjectionSpec) int {
 // createProbeRewritePatch generates the patch for webhook.
 func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) []rfc6902PatchOperation {
 	patch := []rfc6902PatchOperation{}
-	if spec == nil || podSpec == nil {
+	if spec == nil || podSpec == nil || !spec.RewriteAppHTTPProbe {
 		return patch
 	}
 	statusPort := extractStatusPort(spec)
@@ -154,7 +151,7 @@ func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec
 
 // rewriteAppHTTPProbe modifies the podSpec HTTP probers to redirect to pilot agent.
 func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
-	if spec == nil || podSpec == nil {
+	if spec == nil || podSpec == nil || !spec.RewriteAppHTTPProbe {
 		return
 	}
 	statusPort := extractStatusPort(spec)
@@ -169,7 +166,7 @@ func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 			return
 		}
 		httpGet := probe.HTTPGet
-		// Walkaround... proto.Clone can't copy corev1.IntOrStr somehow...
+		// Workaround... proto.Clone can't copy corev1.IntOrStr somehow...
 		httpGet.Port = probe.HTTPGet.Port
 		header := corev1.HTTPHeader{
 			Name:  status.IstioAppPortHeader,
