@@ -93,7 +93,8 @@ func extractStatusPort(spec *SidecarInjectionSpec) int {
 	return statusPort
 }
 
-func calculateProbeRewrite(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec, modify bool) []rfc6902PatchOperation {
+// createProbeRewritePatch generates the patch for webhook.
+func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) []rfc6902PatchOperation {
 	patch := []rfc6902PatchOperation{}
 	if spec == nil || podSpec == nil {
 		return patch
@@ -103,7 +104,6 @@ func calculateProbeRewrite(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec, 
 	if statusPort == -1 {
 		return patch
 	}
-
 	// Change the application containers' probe to point to sidecar's status port.
 	rewriteProbe := func(probe *corev1.Probe, portMap map[string]int32, path string) *rfc6902PatchOperation {
 		if probe == nil || probe.HTTPGet == nil {
@@ -127,9 +127,6 @@ func calculateProbeRewrite(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec, 
 		}
 		httpGet.HTTPHeaders = append(httpGet.HTTPHeaders, header)
 		httpGet.Port = intstr.FromInt(statusPort)
-		if modify {
-			probe.HTTPGet = httpGet
-		}
 		return &rfc6902PatchOperation{
 			Op:    "replace",
 			Path:  path,
@@ -155,11 +152,53 @@ func calculateProbeRewrite(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec, 
 	return patch
 }
 
-// createProbeRewritePatch generates the patch for webhook.
-func createProbeRewritePatch(podSpec *corev1.PodSpec, sic *SidecarInjectionSpec) []rfc6902PatchOperation {
-	return calculateProbeRewrite(podSpec, sic, false)
-}
-
+// rewriteAppHTTPProbe modifies the podSpec HTTP probers to redirect to pilot agent.
 func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
-	calculateProbeRewrite(podSpec, spec, true)
+	if spec == nil || podSpec == nil {
+		return
+	}
+	statusPort := extractStatusPort(spec)
+	// Pilot agent statusPort is not defined, skip changing application http probe.
+	if statusPort == -1 {
+		return
+	}
+
+	// Change the application containers' probe to point to sidecar's status port.
+	rewriteProbe := func(probe *corev1.Probe, portMap map[string]int32) {
+		if probe == nil || probe.HTTPGet == nil {
+			return
+		}
+		httpGet := probe.HTTPGet
+		// Walkaround... proto.Clone can't copy corev1.IntOrStr somehow...
+		httpGet.Port = probe.HTTPGet.Port
+		header := corev1.HTTPHeader{
+			Name:  status.IstioAppPortHeader,
+			Value: httpGet.Port.String(),
+		}
+		// A named port, resolve by looking at port map.
+		if httpGet.Port.Type == intstr.String {
+			port, exists := portMap[httpGet.Port.StrVal]
+			if !exists {
+				log.Errorf("named port not found in the map skip rewriting probing %v", *probe)
+				return
+			}
+			header.Value = strconv.Itoa(int(port))
+		}
+		httpGet.HTTPHeaders = append(httpGet.HTTPHeaders, header)
+		httpGet.Port = intstr.FromInt(statusPort)
+		probe.HTTPGet = httpGet
+		return
+	}
+	for _, c := range podSpec.Containers {
+		// Skip sidecar container.
+		if c.Name == istioProxyContainerName {
+			continue
+		}
+		portMap := map[string]int32{}
+		for _, p := range c.Ports {
+			portMap[p.Name] = p.ContainerPort
+		}
+		rewriteProbe(c.ReadinessProbe, portMap)
+		rewriteProbe(c.LivenessProbe, portMap)
+	}
 }
