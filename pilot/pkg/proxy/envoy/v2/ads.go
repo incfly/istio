@@ -594,7 +594,7 @@ func (s *DiscoveryServer) StreamAggregatedResources(stream ads.AggregatedDiscove
 			// It is very tricky to handle due to the protocol - but the periodic push recovers
 			// from it.
 
-			err := s.pushAll(con, pushEv)
+			err := s.pushConnection(con, pushEv)
 			if err != nil {
 				return nil
 			}
@@ -615,11 +615,10 @@ func (s *DiscoveryServer) initConnectionNode(discReq *xdsapi.DiscoveryRequest, c
 	if discReq.Node == nil || discReq.Node.Id == "" {
 		return errors.New("missing node id")
 	}
-	nt, err := model.ParseServiceNode(discReq.Node.Id)
+	nt, err := model.ParseServiceNodeWithMetadata(discReq.Node.Id, model.ParseMetadata(discReq.Node.Metadata))
 	if err != nil {
 		return err
 	}
-	nt.Metadata = model.ParseMetadata(discReq.Node.Metadata)
 	// Update the config namespace associated with this proxy
 	nt.ConfigNamespace = model.GetProxyConfigNamespace(nt)
 
@@ -631,7 +630,7 @@ func (s *DiscoveryServer) initConnectionNode(discReq *xdsapi.DiscoveryRequest, c
 	}
 	con.mu.Unlock()
 
-	s.globalPushContext().OnConnect(con.modelNode)
+	s.globalPushContext().UpdateNodeIsolation(con.modelNode)
 
 	// TODO
 	// use networkScope to update the list of namespace and service dependencies
@@ -644,9 +643,9 @@ func (s *DiscoveryServer) IncrementalAggregatedResources(stream ads.AggregatedDi
 	return status.Errorf(codes.Unimplemented, "not implemented")
 }
 
-// Compute and send the new configuration. This is blocking and may be slow
-// for large configs.
-func (s *DiscoveryServer) pushAll(con *XdsConnection, pushEv *XdsEvent) error {
+// Compute and send the new configuration for a connection. This is blocking and may be slow
+// for large configs. The method will hold a lock on con.pushMutex.
+func (s *DiscoveryServer) pushConnection(con *XdsConnection, pushEv *XdsEvent) error {
 	// TODO: update the service deps based on NetworkScope
 
 	if pushEv.edsUpdatedServices != nil {
@@ -659,6 +658,9 @@ func (s *DiscoveryServer) pushAll(con *XdsConnection, pushEv *XdsEvent) error {
 		}
 		return nil
 	}
+
+	// This needs to be called to update list of visible services in the node.
+	pushEv.push.UpdateNodeIsolation(con.modelNode)
 
 	adsLog.Infof("Pushing %v", con.ConID)
 
