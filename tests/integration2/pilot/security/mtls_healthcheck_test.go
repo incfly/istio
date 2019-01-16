@@ -42,7 +42,6 @@ func TestMtlsHealthCheck(t *testing.T) {
 kind: "Policy"
 metadata:
   name: "permissive-authn-80"
-  namespace: "istio-system"
 spec:
   targets:
   - name: "a"
