@@ -16,52 +16,54 @@
 package security
 
 import (
+	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"testing"
+	"time"
 
-	authnv1alpha "istio.io/api/authentication/v1alpha1"
-	"istio.io/istio/pilot/pkg/model"
-	"istio.io/istio/pkg/test/framework/runtime/components/environment/native"
-
+	"istio.io/istio/pkg/log"
 	"istio.io/istio/pkg/test/framework"
+	"istio.io/istio/pkg/test/framework/api/components"
 	"istio.io/istio/pkg/test/framework/api/descriptors"
-	"istio.io/istio/pkg/test/framework/api/ids"
 	"istio.io/istio/pkg/test/framework/api/lifecycle"
+	"istio.io/istio/pkg/test/framework/runtime/components/environment/kube"
+	"istio.io/istio/pkg/test/scopes"
 )
 
 // TestMtlsHealthCheck verifies Kubernetes HTTP health check can work when mTLS
 // is enabled.
 func TestMtlsHealthCheck(t *testing.T) {
+	scopes.CI.SetOutputLevel(log.InfoLevel)
 	ctx := framework.GetContext(t)
-	// TODO(incfly): make test able to run both on k8s and native when galley is ready.
-	ctx.RequireOrSkip(t, lifecycle.Test, &descriptors.KubernetesEnvironment, &ids.Apps)
-	env := native.GetEnvironmentOrFail(ctx, t)
-	_, err := env.ServiceManager.ConfigStore.Create(
-		model.Config{
-			ConfigMeta: model.ConfigMeta{
-				Type:      model.AuthenticationPolicy.Type,
-				Name:      "default",
-				Namespace: "istio-system",
-			},
-			Spec: &authnv1alpha.Policy{
-				// TODO: make policy work just applied to service a.
-				// Targets: []*authn.TargetSelector{
-				// 	{
-				// 		Name: "a.istio-system.svc.local",
-				// 	},
-				// },
-				Peers: []*authnv1alpha.PeerAuthenticationMethod{{
-					Params: &authnv1alpha.PeerAuthenticationMethod_Mtls{
-						Mtls: &authnv1alpha.MutualTls{
-							Mode: authnv1alpha.MutualTls_PERMISSIVE,
-						},
-					},
-				}},
-			},
-		},
-	)
+	ctx.RequireOrSkip(t, lifecycle.Test, &descriptors.KubernetesEnvironment)
+	path := filepath.Join(ctx.WorkDir(), "mtls-strict-healthcheck.yaml")
+	err := ioutil.WriteFile(path, []byte(`apiVersion: "authentication.istio.io/v1alpha1"
+kind: "Policy"
+metadata:
+  name: "permissive-authn-80"
+  namespace: "istio-system"
+spec:
+  targets:
+  - name: "a"
+  peers:
+    - mtls:
+        mode: STRICT
+`), 0666)
+	if err != nil {
+		t.Errorf("failed to create authn policy in file %v", err)
+	}
+	env := kube.GetEnvironmentOrFail(ctx, t)
+	_, err = env.DeployYaml(path, lifecycle.Test)
 	if err != nil {
 		t.Error(err)
 	}
-	// apps := components.GetApps(ctx, t)
-	// a := apps.GetAppOrFail("a", t)
+
+	// Deploy app now.
+	ctx.RequireOrFail(t, lifecycle.Test, &descriptors.Apps)
+	apps := components.GetApps(ctx, t)
+	apps.GetAppOrFail("a", t)
+
+	fmt.Println("jianfeih debug we finish everything, success!")
+	time.Sleep(1000 * time.Second)
 }

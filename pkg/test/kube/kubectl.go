@@ -82,6 +82,7 @@ func (c *kubectl) apply(namespace string, filename string) error {
 func (c *kubectl) applyInternal(namespace string, files []string) error {
 	for _, f := range files {
 		scopes.CI.Infof("Applying YAML file: %s", f)
+		fmt.Println("jianfeih debug testing applyInternal ")
 		s, err := shell.Execute("kubectl apply %s %s -f %s", c.configArg(), namespaceArg(namespace), f)
 		if err != nil {
 			return fmt.Errorf("%v: %s", err, s)
