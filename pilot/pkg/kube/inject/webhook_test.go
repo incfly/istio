@@ -27,7 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/ghodss/yaml"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/onsi/gomega"
@@ -725,6 +725,10 @@ func TestHelmInject(t *testing.T) {
 			// Verifies that the resource annotation overrides the default.
 			inputFile: "resource_annotations.yaml",
 			wantFile:  "resource_annotations.yaml.injected",
+		},
+		{
+			inputFile: "user-volume.yaml",
+			wantFile:  "user-volume.yaml.injected",
 		},
 	}
 

@@ -109,6 +109,10 @@ const (
 
 	// IstioDefaultConfigNamespace constant for default namespace
 	IstioDefaultConfigNamespace = "default"
+
+	// AZLabel indicates the region/zone of an instance. It is used if the native
+	// registry doesn't provide one.
+	AZLabel = "istio-az"
 )
 
 // Port represents a network port where a service is listening for
@@ -359,12 +363,6 @@ type ServiceInstance struct {
 	Labels         Labels          `json:"labels,omitempty"`
 	ServiceAccount string          `json:"serviceaccount,omitempty"`
 }
-
-const (
-	// AZLabel indicates the region/zone of an instance. It is used if the native
-	// registry doesn't provide one.
-	AZLabel = "istio-az"
-)
 
 // GetLocality returns the availability zone from an instance.
 // - k8s: region/zone, extracted from node's failure-domain.beta.kubernetes.io/{region,zone}

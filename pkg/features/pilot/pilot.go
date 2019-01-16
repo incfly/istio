@@ -74,11 +74,3 @@ var (
 	// config. In most cases 'istio-system' should be included. Comma separated (ns1,ns2,istio-system)
 	NetworkScopes = os.Getenv("DEFAULT_NAMESPACE_DEPENDENCIES")
 )
-
-const (
-
-	// NodeMetadataNetwork defines the network the node belongs to. It is an optional metadata,
-	// set at injection time. When set, the Endpoints returned to a note and not on same network
-	// will be replaced with the gateway defined in the settings.
-	NodeMetadataNetwork = "NETWORK"
-)

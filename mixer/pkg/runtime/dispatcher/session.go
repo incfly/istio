@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/gogo/googleapis/google/rpc"
-	"github.com/hashicorp/go-multierror"
+	multierror "github.com/hashicorp/go-multierror"
 	"go.opencensus.io/stats"
 
 	tpb "istio.io/api/mixer/adapter/model/v1beta1"
@@ -231,6 +231,9 @@ func (s *session) dispatch() error {
 					hop.Value, verr = op.HeaderValue.EvaluateString(s.responseBag)
 					if verr != nil {
 						log.Warnf("Failed to evaluate header value: %v", verr)
+						continue
+					}
+					if hop.Value == "" {
 						continue
 					}
 				}

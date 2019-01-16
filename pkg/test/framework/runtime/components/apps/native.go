@@ -24,7 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
+	xdsapi "github.com/envoyproxy/go-control-plane/envoy/api/v2"
+	"github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
+	multierror "github.com/hashicorp/go-multierror"
 
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pkg/test/application/echo"
@@ -238,6 +240,17 @@ func configDumpStr(a components.App) (string, error) {
 	return envoy.GetConfigDumpStr(a.(*nativeApp).agent.GetAdminPort())
 }
 
+// ConstructDiscoveryRequest returns an Envoy discovery request.
+func ConstructDiscoveryRequest(a components.App, typeURL string) *xdsapi.DiscoveryRequest {
+	nodeID := agent.GetNodeID(a.(*nativeApp).agent)
+	return &xdsapi.DiscoveryRequest{
+		Node: &core.Node{
+			Id: nodeID,
+		},
+		TypeUrl: typeURL,
+	}
+}
+
 type appConfig struct {
 	serviceName      string
 	version          string
@@ -269,7 +282,7 @@ func newNativeApp(cfg appConfig) (a components.App, err error) {
 	}).NewAgent
 
 	// Create and start the agent.
-	newapp.agent, err = agentFactory(cfg.serviceName, cfg.version, cfg.serviceManager, appFactory)
+	newapp.agent, err = agentFactory(cfg.serviceName, cfg.version, cfg.serviceManager, appFactory, nil)
 	if err != nil {
 		return
 	}

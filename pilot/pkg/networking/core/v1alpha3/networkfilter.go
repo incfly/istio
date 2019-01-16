@@ -37,7 +37,8 @@ var redisOpTimeout = 5 * time.Second
 
 // buildInboundNetworkFilters generates a TCP proxy network filter on the inbound path
 func buildInboundNetworkFilters(env *model.Environment, node *model.Proxy, instance *model.ServiceInstance) []listener.Filter {
-	clusterName := model.BuildSubsetKey(model.TrafficDirectionInbound, "", instance.Service.Hostname, instance.Endpoint.ServicePort.Port)
+	clusterName := model.BuildSubsetKey(model.TrafficDirectionInbound, instance.Endpoint.ServicePort.Name,
+		instance.Service.Hostname, instance.Endpoint.ServicePort.Port)
 	config := &tcp_proxy.TcpProxy{
 		StatPrefix:       clusterName,
 		ClusterSpecifier: &tcp_proxy.TcpProxy_Cluster{Cluster: clusterName},
@@ -53,7 +54,7 @@ func setAccessLogAndBuildTCPFilter(env *model.Environment, node *model.Proxy, co
 			Path: env.Mesh.AccessLogFile,
 		}
 
-		if util.Is11Proxy(node) {
+		if util.IsProxyVersionGE11(node) {
 			buildAccessLog(fl, env)
 		}
 
@@ -102,11 +103,13 @@ func buildOutboundNetworkFiltersWithWeightedClusters(env *model.Environment, nod
 	}
 
 	for _, route := range routes {
-		clusterName := istio_route.GetDestinationCluster(route.Destination, push.ServiceByHostname[model.Hostname(route.Destination.Host)], port.Port)
-		clusterSpecifier.WeightedClusters.Clusters = append(clusterSpecifier.WeightedClusters.Clusters, &tcp_proxy.TcpProxy_WeightedCluster_ClusterWeight{
-			Name:   clusterName,
-			Weight: uint32(route.Weight),
-		})
+		if route.Weight > 0 {
+			clusterName := istio_route.GetDestinationCluster(route.Destination, push.ServiceByHostname[model.Hostname(route.Destination.Host)], port.Port)
+			clusterSpecifier.WeightedClusters.Clusters = append(clusterSpecifier.WeightedClusters.Clusters, &tcp_proxy.TcpProxy_WeightedCluster_ClusterWeight{
+				Name:   clusterName,
+				Weight: uint32(route.Weight),
+			})
+		}
 	}
 
 	// TODO: Need to handle multiple cluster names for Redis

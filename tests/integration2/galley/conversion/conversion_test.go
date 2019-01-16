@@ -15,14 +15,15 @@
 package conversion
 
 import (
+	"fmt"
 	"testing"
 
+	"istio.io/istio/galley/pkg/testing/testdata"
 	"istio.io/istio/pkg/test/framework"
 	"istio.io/istio/pkg/test/framework/api/components"
 	"istio.io/istio/pkg/test/framework/api/descriptors"
 	"istio.io/istio/pkg/test/framework/api/ids"
 	"istio.io/istio/pkg/test/framework/api/lifecycle"
-	"istio.io/istio/tests/integration2/galley/conversion/testdata"
 )
 
 func TestConversion(t *testing.T) {
@@ -44,41 +45,58 @@ func TestConversion(t *testing.T) {
 
 			// TODO: Limit to Native environment until the Kubernetes environment is supported in the Galley
 			// component
-			ctx.Require(lifecycle.Suite, &descriptors.NativeEnvironment)
+			ctx.RequireOrFail(t, lifecycle.Suite, &descriptors.NativeEnvironment)
 
-			ctx.Require(lifecycle.Test, &ids.Galley)
+			ctx.RequireOrFail(t, lifecycle.Test, &ids.Galley)
 
 			gal := components.GetGalley(ctx, t)
 
-			input, err := d.LoadInputFile()
-			if err != nil {
-				t.Fatalf("Unable to load input test data: %v", err)
-			}
-
-			if d.HasMeshConfigFile() {
-				mc, err := d.LoadMeshConfigFile()
-				if err != nil {
-					t.Fatalf("Error loading Mesh config file: %v", err)
+			for i, fset := range d.FileSets() {
+				testName := d.TestName()
+				if len(d.FileSets()) != 1 {
+					runTest(t, fset, gal)
+					testName = fmt.Sprintf("%s_%d", d.TestName(), i)
 				}
-				if err = gal.SetMeshConfig(string(mc)); err != nil {
-					t.Fatalf("Error setting Mesh config file: %v", err)
-				}
-			}
-
-			expected, err := d.LoadExpectedResources()
-			if err != nil {
-				t.Fatalf("unable to load expected resources: %v", err)
-			}
-
-			if err = gal.ApplyConfig(string(input)); err != nil {
-				t.Fatalf("unable to apply config to Galley: %v", err)
-			}
-
-			for typeURL, e := range expected {
-				if err = gal.WaitForSnapshot(typeURL, e...); err != nil {
-					t.Errorf("Error waiting for %s:\n%v\n", typeURL, err)
-				}
+				t.Run(testName, func(t *testing.T) {
+					runTest(t, fset, gal)
+				})
 			}
 		})
+	}
+}
+
+func runTest(t *testing.T, fset *testdata.FileSet, gal components.Galley) {
+	input, err := fset.LoadInputFile()
+	if err != nil {
+		t.Fatalf("Unable to load input test data: %v", err)
+	}
+
+	if fset.HasMeshConfigFile() {
+		mc, err := fset.LoadMeshConfigFile()
+		if err != nil {
+			t.Fatalf("Error loading Mesh config file: %v", err)
+		}
+		if err = gal.SetMeshConfig(string(mc)); err != nil {
+			t.Fatalf("Error setting Mesh config file: %v", err)
+		}
+	}
+
+	expected, err := fset.LoadExpectedResources()
+	if err != nil {
+		t.Fatalf("unable to load expected resources: %v", err)
+	}
+
+	if err = gal.ClearConfig(); err != nil {
+		t.Fatalf("unable to clear config from Galley: %v", err)
+	}
+
+	if err = gal.ApplyConfig(string(input)); err != nil {
+		t.Fatalf("unable to apply config to Galley: %v", err)
+	}
+
+	for typeURL, e := range expected {
+		if err = gal.WaitForSnapshot(typeURL, e...); err != nil {
+			t.Errorf("Error waiting for %s:\n%v\n", typeURL, err)
+		}
 	}
 }

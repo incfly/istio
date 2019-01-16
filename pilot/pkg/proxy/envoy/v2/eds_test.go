@@ -30,7 +30,7 @@ import (
 
 	"istio.io/istio/pilot/pkg/bootstrap"
 	"istio.io/istio/pilot/pkg/model"
-	"istio.io/istio/pilot/pkg/proxy/envoy/v2"
+	v2 "istio.io/istio/pilot/pkg/proxy/envoy/v2"
 	"istio.io/istio/pkg/adsc"
 	"istio.io/istio/pkg/test/env"
 	"istio.io/istio/tests/util"
@@ -338,8 +338,8 @@ func multipleRequest(server *bootstrap.Server, inc bool, nclients,
 			// This will be throttled - we want to trigger a single push
 			//server.EnvoyXdsServer.MemRegistry.SetEndpoints(edsIncSvc,
 			//	newEndpointWithAccount("127.0.0.2", "hello-sa", "v1"))
-			updates := map[string]*v2.EndpointShardsByService{
-				edsIncSvc: &v2.EndpointShardsByService{},
+			updates := map[string]*v2.EndpointShards{
+				edsIncSvc: &v2.EndpointShards{},
 			}
 			server.EnvoyXdsServer.AdsPushAll(strconv.Itoa(j), server.EnvoyXdsServer.Env.PushContext, false, updates)
 		} else {

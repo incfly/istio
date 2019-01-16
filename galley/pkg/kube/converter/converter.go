@@ -15,17 +15,19 @@
 package converter
 
 import (
-	json2 "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
+	corev1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	authn "istio.io/api/authentication/v1alpha1"
 	meshconfig "istio.io/api/mesh/v1alpha1"
+	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/istio/galley/pkg/kube/converter/legacy"
 	"istio.io/istio/galley/pkg/runtime/resource"
 	"istio.io/istio/pilot/pkg/serviceregistry/kube"
@@ -40,6 +42,7 @@ type Fn func(cfg *Config, destination resource.Info, name resource.FullName, kin
 // Entry is a single converted entry.
 type Entry struct {
 	Key          resource.FullName
+	Metadata     resource.Metadata
 	CreationTime time.Time
 	Resource     proto.Message
 }
@@ -54,6 +57,7 @@ var converters = func() map[string]Fn {
 	m["legacy-mixer-resource"] = legacyMixerResource
 	m["auth-policy-resource"] = authPolicyResource
 	m["kube-ingress-resource"] = kubeIngressResource
+	m["kube-service-resource"] = kubeServiceResource
 
 	return m
 }()
@@ -68,20 +72,34 @@ func Get(name string) Fn {
 	return fn
 }
 
+// Converts between different representations of the same JSON-compatible
+// object (eg. type struct and map[string]interface{}),
+func convertJSON(from, to interface{}) error {
+	js, err := json.Marshal(from)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(js, to)
+}
+
 func identity(_ *Config, destination resource.Info, name resource.FullName, _ string, u *unstructured.Unstructured) ([]Entry, error) {
 	var p proto.Message
 	creationTime := time.Time{}
+	var metadata resource.Metadata
 	if u != nil {
 		var err error
 		if p, err = toProto(destination, u.Object["spec"]); err != nil {
 			return nil, err
 		}
 		creationTime = u.GetCreationTimestamp().Time
+		metadata.Labels = u.GetLabels()
+		metadata.Annotations = u.GetAnnotations()
 	}
 
 	e := Entry{
 		Key:          name,
 		CreationTime: creationTime,
+		Metadata:     metadata,
 		Resource:     p,
 	}
 
@@ -95,6 +113,7 @@ func nilConverter(_ *Config, _ resource.Info, _ resource.FullName, _ string, _ *
 func legacyMixerResource(_ *Config, _ resource.Info, name resource.FullName, kind string, u *unstructured.Unstructured) ([]Entry, error) {
 	s := &types.Struct{}
 	creationTime := time.Time{}
+	var metadata resource.Metadata
 	var res *legacy.LegacyMixerResource
 
 	if u != nil {
@@ -103,6 +122,8 @@ func legacyMixerResource(_ *Config, _ resource.Info, name resource.FullName, kin
 			return nil, err
 		}
 		creationTime = u.GetCreationTimestamp().Time
+		metadata.Labels = u.GetLabels()
+		metadata.Annotations = u.GetAnnotations()
 		res = &legacy.LegacyMixerResource{
 			Name:     name.String(),
 			Kind:     kind,
@@ -116,6 +137,7 @@ func legacyMixerResource(_ *Config, _ resource.Info, name resource.FullName, kin
 	e := Entry{
 		Key:          newName,
 		CreationTime: creationTime,
+		Metadata:     metadata,
 		Resource:     res,
 	}
 
@@ -125,12 +147,15 @@ func legacyMixerResource(_ *Config, _ resource.Info, name resource.FullName, kin
 func authPolicyResource(_ *Config, destination resource.Info, name resource.FullName, _ string, u *unstructured.Unstructured) ([]Entry, error) {
 	var p proto.Message
 	creationTime := time.Time{}
+	var metadata resource.Metadata
 	if u != nil {
 		var err error
 		if p, err = toProto(destination, u.Object["spec"]); err != nil {
 			return nil, err
 		}
 		creationTime = u.GetCreationTimestamp().Time
+		metadata.Labels = u.GetLabels()
+		metadata.Annotations = u.GetAnnotations()
 
 		policy, ok := p.(*authn.Policy)
 		if !ok {
@@ -173,6 +198,7 @@ func authPolicyResource(_ *Config, destination resource.Info, name resource.Full
 	e := Entry{
 		Key:          name,
 		CreationTime: creationTime,
+		Metadata:     metadata,
 		Resource:     p,
 	}
 
@@ -181,19 +207,17 @@ func authPolicyResource(_ *Config, destination resource.Info, name resource.Full
 
 func kubeIngressResource(cfg *Config, _ resource.Info, name resource.FullName, _ string, u *unstructured.Unstructured) ([]Entry, error) {
 	creationTime := time.Time{}
+	var metadata resource.Metadata
 	var p *extensions.IngressSpec
 	if u != nil {
-		json, err := u.MarshalJSON()
-		if err != nil {
+		ing := &extensions.Ingress{}
+		if err := convertJSON(u, ing); err != nil {
 			return nil, err
 		}
 
 		creationTime = u.GetCreationTimestamp().Time
-
-		ing := &extensions.Ingress{}
-		if err = json2.Unmarshal(json, ing); err != nil {
-			return nil, err
-		}
+		metadata.Labels = u.GetLabels()
+		metadata.Annotations = u.GetAnnotations()
 
 		if !shouldProcessIngress(cfg, ing) {
 			return nil, nil
@@ -205,10 +229,40 @@ func kubeIngressResource(cfg *Config, _ resource.Info, name resource.FullName, _
 	e := Entry{
 		Key:          name,
 		CreationTime: creationTime,
+		Metadata:     metadata,
 		Resource:     p,
 	}
 
 	return []Entry{e}, nil
+}
+
+func kubeServiceResource(cfg *Config, _ resource.Info, name resource.FullName, _ string, u *unstructured.Unstructured) ([]Entry, error) {
+	var service corev1.Service
+	if err := convertJSON(u, &service); err != nil {
+		return nil, err
+	}
+	se := networking.ServiceEntry{
+		Hosts:      []string{fmt.Sprintf("%s.%s.svc.%s", service.Name, service.Namespace, cfg.DomainSuffix)},
+		Addresses:  append([]string{service.Spec.ClusterIP}, service.Spec.ExternalIPs...),
+		Resolution: networking.ServiceEntry_STATIC,
+		Location:   networking.ServiceEntry_MESH_INTERNAL,
+	}
+	for _, kubePort := range service.Spec.Ports {
+		se.Ports = append(se.Ports, &networking.Port{
+			Name:     kubePort.Name,
+			Number:   uint32(kubePort.Port),
+			Protocol: string(kube.ConvertProtocol(kubePort.Name, kubePort.Protocol)),
+		})
+	}
+	return []Entry{{
+		Key:          name,
+		CreationTime: service.CreationTimestamp.Time,
+		Metadata: resource.Metadata{
+			Labels:      service.Labels,
+			Annotations: service.Annotations,
+		},
+		Resource: &se,
+	}}, nil
 }
 
 // shouldProcessIngress determines whether the given ingress resource should be processed
