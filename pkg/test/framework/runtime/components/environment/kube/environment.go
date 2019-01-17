@@ -176,10 +176,11 @@ func (e *Environment) Start(ctx context.Instance, scope lifecycle.Scope) error {
 		injectionEnabled: true,
 	}
 	e.testNamespace = &namespace{
-		name:             e.s.TestNamespace,
-		annotation:       "istio-test",
-		accessor:         e.Accessor,
-		injectionEnabled: false,
+		name:       e.s.TestNamespace,
+		annotation: "istio-test",
+		accessor:   e.Accessor,
+		// injectionEnabled: false,
+		injectionEnabled: true,
 	}
 
 	if err := e.systemNamespace.allocate(); err != nil {

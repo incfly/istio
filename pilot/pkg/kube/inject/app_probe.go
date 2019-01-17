@@ -139,10 +139,10 @@ func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec
 		for _, p := range c.Ports {
 			portMap[p.Name] = p.ContainerPort
 		}
-		if p := rewriteProbe(c.ReadinessProbe, portMap, fmt.Sprintf("/spec/containers/%v/readinessProbe", i)); p != nil {
+		if p := rewriteProbe(c.ReadinessProbe, portMap, fmt.Sprintf("/spec/containers/%v/readinessProbe/httpGet", i)); p != nil {
 			patch = append(patch, *p)
 		}
-		if p := rewriteProbe(c.LivenessProbe, portMap, fmt.Sprintf("/spec/containers/%v/livenessProbe", i)); p != nil {
+		if p := rewriteProbe(c.LivenessProbe, portMap, fmt.Sprintf("/spec/containers/%v/livenessProbe/httpGet", i)); p != nil {
 			patch = append(patch, *p)
 		}
 	}

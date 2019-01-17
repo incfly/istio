@@ -22,19 +22,17 @@ import (
 	"testing"
 	"time"
 
-	"istio.io/istio/pkg/log"
 	"istio.io/istio/pkg/test/framework"
 	"istio.io/istio/pkg/test/framework/api/components"
 	"istio.io/istio/pkg/test/framework/api/descriptors"
 	"istio.io/istio/pkg/test/framework/api/lifecycle"
 	"istio.io/istio/pkg/test/framework/runtime/components/environment/kube"
-	"istio.io/istio/pkg/test/scopes"
 )
 
 // TestMtlsHealthCheck verifies Kubernetes HTTP health check can work when mTLS
 // is enabled.
 func TestMtlsHealthCheck(t *testing.T) {
-	scopes.CI.SetOutputLevel(log.InfoLevel)
+	// scopes.CI.SetOutputLevel(log.InfoLevel)
 	ctx := framework.GetContext(t)
 	ctx.RequireOrSkip(t, lifecycle.Test, &descriptors.KubernetesEnvironment)
 	path := filepath.Join(ctx.WorkDir(), "mtls-strict-healthcheck.yaml")
