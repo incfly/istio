@@ -32,14 +32,13 @@ import (
 // TestMtlsHealthCheck verifies Kubernetes HTTP health check can work when mTLS
 // is enabled.
 func TestMtlsHealthCheck(t *testing.T) {
-	// scopes.CI.SetOutputLevel(log.InfoLevel)
 	ctx := framework.GetContext(t)
 	ctx.RequireOrSkip(t, lifecycle.Test, &descriptors.KubernetesEnvironment)
 	path := filepath.Join(ctx.WorkDir(), "mtls-strict-healthcheck.yaml")
 	err := ioutil.WriteFile(path, []byte(`apiVersion: "authentication.istio.io/v1alpha1"
 kind: "Policy"
 metadata:
-  name: "permissive-authn-80"
+  name: "mtls-strict-for-a"
 spec:
   targets:
   - name: "a"
