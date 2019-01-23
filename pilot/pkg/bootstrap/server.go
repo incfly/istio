@@ -390,6 +390,7 @@ func (s *Server) initMesh(args *PilotArgs) error {
 					log.Infof("mesh configuration sources have changed")
 					//TODO Need to re-create or reload initConfigController()
 				}
+				s.mesh = mesh
 				s.EnvoyXdsServer.ConfigUpdate(true)
 			}
 		})
@@ -407,6 +408,11 @@ func (s *Server) initMesh(args *PilotArgs) error {
 			mesh.MixerCheckServer = args.Mesh.MixerAddress
 			mesh.MixerReportServer = args.Mesh.MixerAddress
 		}
+	}
+
+	if err = model.ValidateMeshConfig(mesh); err != nil {
+		log.Errorf("invalid mesh configuration: %v", err)
+		return err
 	}
 
 	log.Infof("mesh configuration %s", spew.Sdump(mesh))

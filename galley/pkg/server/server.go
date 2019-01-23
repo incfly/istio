@@ -18,9 +18,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
-	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -28,14 +25,16 @@ import (
 	"google.golang.org/grpc"
 
 	mcp "istio.io/api/mcp/v1alpha1"
-	"istio.io/istio/galley/pkg/fs"
-	"istio.io/istio/galley/pkg/kube"
-	kubeConverter "istio.io/istio/galley/pkg/kube/converter"
-	kubeSource "istio.io/istio/galley/pkg/kube/source"
 	"istio.io/istio/galley/pkg/meshconfig"
 	"istio.io/istio/galley/pkg/metadata"
 	kubeMeta "istio.io/istio/galley/pkg/metadata/kube"
 	"istio.io/istio/galley/pkg/runtime"
+	"istio.io/istio/galley/pkg/source/fs"
+	kubeSource "istio.io/istio/galley/pkg/source/kube"
+	"istio.io/istio/galley/pkg/source/kube/client"
+	"istio.io/istio/galley/pkg/source/kube/dynamic/converter"
+	"istio.io/istio/galley/pkg/source/kube/schema"
+	"istio.io/istio/galley/pkg/source/kube/schema/check"
 	"istio.io/istio/pkg/ctrlz"
 	"istio.io/istio/pkg/log"
 	"istio.io/istio/pkg/mcp/creds"
@@ -62,19 +61,19 @@ type Server struct {
 }
 
 type patchTable struct {
-	newKubeFromConfigFile       func(string) (kube.Interfaces, error)
-	verifyResourceTypesPresence func(kube.Interfaces) error
-	newSource                   func(kube.Interfaces, time.Duration, *kube.Schema, *kubeConverter.Config) (runtime.Source, error)
+	newKubeFromConfigFile       func(string) (client.Interfaces, error)
+	verifyResourceTypesPresence func(client.Interfaces) error
+	newSource                   func(client.Interfaces, time.Duration, *schema.Instance, *converter.Config) (runtime.Source, error)
 	netListen                   func(network, address string) (net.Listener, error)
 	newMeshConfigCache          func(path string) (meshconfig.Cache, error)
 	mcpMetricReporter           func(string) monitoring.Reporter
-	fsNew                       func(string, *kube.Schema, *kubeConverter.Config) (runtime.Source, error)
+	fsNew                       func(string, *schema.Instance, *converter.Config) (runtime.Source, error)
 }
 
 func defaultPatchTable() patchTable {
 	return patchTable{
-		newKubeFromConfigFile:       kube.NewKubeFromConfigFile,
-		verifyResourceTypesPresence: kubeSource.VerifyResourceTypesPresence,
+		newKubeFromConfigFile:       client.NewKubeFromConfigFile,
+		verifyResourceTypesPresence: check.ResourceTypesPresence,
 		newSource:                   kubeSource.New,
 		netListen:                   net.Listen,
 		mcpMetricReporter:           func(prefix string) monitoring.Reporter { return monitoring.NewStatsContext(prefix) },
@@ -85,18 +84,10 @@ func defaultPatchTable() patchTable {
 
 // New returns a new instance of a Server.
 func New(a *Args) (*Server, error) {
-	var convertK8SService bool
-	if s := os.Getenv("ISTIO_CONVERT_K8S_SERVICE"); s != "" {
-		b, err := strconv.ParseBool(s)
-		if err != nil {
-			return nil, err
-		}
-		convertK8SService = b
-	}
-	return newServer(a, defaultPatchTable(), convertK8SService)
+	return newServer(a, defaultPatchTable())
 }
 
-func newServer(a *Args, p patchTable, convertK8SService bool) (*Server, error) {
+func newServer(a *Args, p patchTable) (*Server, error) {
 	var err error
 	s := &Server{}
 
@@ -111,34 +102,16 @@ func newServer(a *Args, p patchTable, convertK8SService bool) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	converterCfg := &kubeConverter.Config{
+	converterCfg := &converter.Config{
 		Mesh:         mesh,
 		DomainSuffix: a.DomainSuffix,
 	}
-	specs := kubeMeta.Types.All()
-	if !convertK8SService {
-		var filtered []kube.ResourceSpec
-		for _, t := range specs {
-			// TODO(nmittler): Temporarily filter Node and Pod until custom sources land.
-			// Pod yaml cannot be parsed currently. See: https://github.com/istio/istio/issues/10891
-			if t.Kind != "Service" && t.Kind != "Node" && t.Kind != "Pod" {
-				filtered = append(filtered, t)
-			}
-		}
-		specs = filtered
-	}
-	sort.Slice(specs, func(i, j int) bool {
-		return strings.Compare(specs[i].CanonicalResourceName(), specs[j].CanonicalResourceName()) < 0
-	})
-	sb := kube.NewSchemaBuilder()
-	for _, s := range specs {
-		sb.Add(s)
-	}
-	schema := sb.Build()
+
+	sourceSchema := getSourceSchema(a)
 
 	var src runtime.Source
 	if a.ConfigPath != "" {
-		src, err = p.fsNew(a.ConfigPath, schema, converterCfg)
+		src, err = p.fsNew(a.ConfigPath, sourceSchema, converterCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -152,7 +125,7 @@ func newServer(a *Args, p patchTable, convertK8SService bool) (*Server, error) {
 				return nil, err
 			}
 		}
-		src, err = p.newSource(k, a.ResyncPeriod, schema, converterCfg)
+		src, err = p.newSource(k, a.ResyncPeriod, sourceSchema, converterCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -220,6 +193,25 @@ func newServer(a *Args, p patchTable, convertK8SService bool) (*Server, error) {
 	return s, nil
 }
 
+func getSourceSchema(a *Args) *schema.Instance {
+	b := schema.NewBuilder()
+	for _, spec := range kubeMeta.Types.All() {
+		if !isKindExcluded(a, spec.Kind) {
+			b.Add(spec)
+		}
+	}
+	return b.Build()
+}
+
+func isKindExcluded(a *Args, kind string) bool {
+	for _, excludedKind := range a.ExcludedResourceKinds {
+		if kind == excludedKind {
+			return true
+		}
+	}
+	return false
+}
+
 // Run enables Galley to start receiving gRPC requests on its main API port.
 func (s *Server) Run() {
 	s.serveWG.Add(1)
@@ -239,17 +231,21 @@ func (s *Server) Run() {
 	}()
 }
 
-// Close cleans up resources used by the server.
-func (s *Server) Close() error {
+// ForceClose cleans up resources used by the server.
+// ForceClose should be used only in testing to make the server stop quickly
+func (s *Server) ForceClose() error {
 	if s.stopCh != nil {
 		close(s.stopCh)
 		s.stopCh = nil
 	}
-
 	if s.grpcServer != nil {
-		s.grpcServer.GracefulStop()
+		s.grpcServer.Stop()
 		s.serveWG.Wait()
 	}
+	return s.closeResources()
+}
+
+func (s *Server) closeResources() error {
 
 	if s.controlZ != nil {
 		s.controlZ.Close()
@@ -271,6 +267,19 @@ func (s *Server) Close() error {
 	_ = log.Sync()
 
 	return nil
+}
+
+// Close cleans up resources used by the server.
+func (s *Server) Close() error {
+	if s.stopCh != nil {
+		close(s.stopCh)
+		s.stopCh = nil
+	}
+	if s.grpcServer != nil {
+		s.grpcServer.GracefulStop()
+		s.serveWG.Wait()
+	}
+	return s.closeResources()
 }
 
 //RunServer start Galley Server mode
