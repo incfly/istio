@@ -114,7 +114,7 @@ func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec
 		return nil
 	}
 	// Change the application containers' probe to point to sidecar's status port.
-	// TODO: here rewrite teh rewriteProbe function in new approach.
+	// TODO: here rewrite the rewriteProbe function in new approach.
 	rewriteProbe := func(probe *corev1.Probe, portMap map[string]int32, path string) *rfc6902PatchOperation {
 		return nil
 		// if probe == nil || probe.HTTPGet == nil {
@@ -162,13 +162,6 @@ func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec
 	}
 	return patch
 }
-
-// // rewriteAppHTTPProbe modifies the podSpec HTTP probers to redirect to pilot agent.
-// func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
-// 	if spec == nil || podSpec == nil || !spec.RewriteAppHTTPProbe {
-// 		return
-// 	}
-// 	statusPort := extractStatusPort(spec)
 
 // extractStatusPort accepts the sidecar container spec and returns its port for healthiness probing.
 func extractStatusPort(sidecar *corev1.Container) int {
@@ -230,7 +223,7 @@ func rewriteProbe(probe *corev1.Probe, appProbers *status.KubeAppProbers,
 	httpGet.Path = newURL
 }
 
-func rewriteAppHTTPProbe(spec *SidecarInjectionSpec, podSpec *corev1.PodSpec) {
+func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 	if spec == nil || podSpec == nil {
 		return
 	}
