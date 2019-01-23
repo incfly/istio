@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 
 	"io"
 	"time"
@@ -87,7 +88,14 @@ func (c *nativeComponent) Scope() lifecycle.Scope {
 
 // SetMeshConfig applies the given mesh config yaml file via Galley.
 func (c *nativeComponent) SetMeshConfig(yamlText string) error {
-	return ioutil.WriteFile(c.meshConfigFile, []byte(yamlText), os.ModePerm)
+	if err := ioutil.WriteFile(c.meshConfigFile, []byte(yamlText), os.ModePerm); err != nil {
+		return err
+	}
+	if err := c.Close(); err != nil {
+		return err
+	}
+
+	return c.restart()
 }
 
 // ClearConfig implements Galley.ClearConfig.
@@ -116,6 +124,16 @@ func (c *nativeComponent) ApplyConfig(yamlText string) (err error) {
 	}
 
 	return
+}
+
+// GetGalleyAddress returns the galley mcp server address
+func (c *nativeComponent) GetGalleyAddress() string {
+	idx := strings.Index(c.client.address, "://")
+	if idx < 0 {
+		return fmt.Sprintf("mcp://%s", c.client.address)
+	}
+	return fmt.Sprintf("mcp://%s", c.client.address[idx+3:])
+
 }
 
 // WaitForSnapshot implements Galley.WaitForSnapshot.
@@ -159,12 +177,19 @@ func (c *nativeComponent) Reset() error {
 		return err
 	}
 
+	return c.restart()
+}
+
+func (c *nativeComponent) restart() error {
 	a := server.DefaultArgs()
 	a.Insecure = true
 	a.EnableServer = true
 	a.DisableResourceReadyCheck = true
 	a.ConfigPath = c.configDir
 	a.MeshConfigFile = c.meshConfigFile
+	// To prevent ctrlZ port collision between galley/pilot&mixer
+	a.IntrospectionOptions.Port = 9877
+	a.ExcludedResourceKinds = make([]string, 0)
 	s, err := server.New(a)
 	if err != nil {
 		scopes.Framework.Errorf("Error starting Galley: %v", err)
@@ -194,7 +219,7 @@ func (c *nativeComponent) Close() (err error) {
 		c.client = nil
 	}
 	if c.server != nil {
-		err := multierror.Append(c.server.Close()).ErrorOrNil()
+		err := multierror.Append(c.server.ForceClose()).ErrorOrNil()
 		if err != nil {
 			scopes.Framework.Infof("Error while Galley server close during reset: %v", err)
 		}
