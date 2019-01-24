@@ -31,6 +31,10 @@ import (
 
 // TestMtlsHealthCheck verifies Kubernetes HTTP health check can work when mTLS
 // is enabled.
+// go test -v ./tests/integration2/pilot/security -run="TestMtlsHealthCheck" -istio.test.env  \
+// kubernetes -istio.test.kube.helm.values \
+// "sidecarInjectorWebhook.rewriteAppHTTPProbe=true,global.hub=gcr.io/jianfeih-test,global.tag=0115a"  \
+// --istio.test.kube.testNamespace istio-test   | tee -a somefile
 func TestMtlsHealthCheck(t *testing.T) {
 	ctx := framework.GetContext(t)
 	ctx.RequireOrSkip(t, lifecycle.Test, &descriptors.KubernetesEnvironment)
