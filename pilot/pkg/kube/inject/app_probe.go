@@ -109,6 +109,8 @@ func calculateRewrite(probe *corev1.Probe, newURL string,
 }
 
 // createProbeRewritePatch generates the patch for webhook.
+// TODO(here): problems, the webhook injector when see a pod, may or maynot have istio-proxy sidecar
+// container there.
 func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) []rfc6902PatchOperation {
 	patch := []rfc6902PatchOperation{}
 	if spec == nil || podSpec == nil || !spec.RewriteAppHTTPProbe {
@@ -156,6 +158,8 @@ func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec
 			})
 		}
 	}
+
+	// TODO: also here, need to add a patch to update the command line flags.
 	return patch
 }
 
