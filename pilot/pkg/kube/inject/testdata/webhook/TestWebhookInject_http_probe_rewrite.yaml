@@ -3,6 +3,9 @@ spec:
     - name: istio-init
   containers:
     - name: istio-proxy
+      args:
+        - --statusPort
+        - "15020"
     - name: hello
       image: "fake.docker.io/google-samples/hello-go-gke:1.0"
       ports:

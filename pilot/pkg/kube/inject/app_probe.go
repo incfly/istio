@@ -45,124 +45,6 @@ var (
 	statusPortPattern = regexp.MustCompile(fmt.Sprintf(`^-{1,2}%s(=(?P<port>\d+))?$`, StatusPortCmdFlagName))
 )
 
-// // extractStatusPort returns the port value of the pilot agent sidecar container statusPort.
-// // Return -1 if not found.
-// func extractStatusPort(spec *SidecarInjectionSpec) int {
-// 	if spec == nil {
-// 		return -1
-// 	}
-// 	statusPort := -1
-// 	for _, c := range spec.Containers {
-// 		if c.Name != istioProxyContainerName {
-// 			continue
-// 		}
-// 		for i, arg := range c.Args {
-// 			// Skip for unrelated args.
-// 			match := statusPortPattern.FindAllStringSubmatch(strings.TrimSpace(arg), -1)
-// 			if len(match) != 1 {
-// 				continue
-// 			}
-// 			groups := statusPortPattern.SubexpNames()
-// 			portStr := ""
-// 			for ind, s := range match[0] {
-// 				if groups[ind] == "port" {
-// 					portStr = s
-// 					break
-// 				}
-// 			}
-// 			// Port not found from current arg, extract from next arg.
-// 			if portStr == "" {
-// 				// Matches the regex pattern, but without actual values provided.
-// 				if len(c.Args) <= i+1 {
-// 					log.Errorf("No statusPort value provided, skip app probe rewriting")
-// 					return -1
-// 				}
-// 				portStr = c.Args[i+1]
-// 			}
-// 			p, err := strconv.Atoi(portStr)
-// 			if err != nil {
-// 				log.Errorf("Failed to convert statusPort to int %v, err %v", portStr, err)
-// 				return -1
-// 			}
-// 			statusPort = p
-// 			break
-// 		}
-// 	}
-// 	return statusPort
-// }
-
-// createProbeRewritePatch generates the patch for webhook.
-func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) []rfc6902PatchOperation {
-	patch := []rfc6902PatchOperation{}
-	if spec == nil || podSpec == nil || !spec.RewriteAppHTTPProbe {
-		return patch
-	}
-	var sidecar *corev1.Container
-	for i := range podSpec.Containers {
-		if podSpec.Containers[i].Name == istioProxyContainerName {
-			sidecar = &podSpec.Containers[i]
-			break
-		}
-	}
-	if sidecar == nil {
-		return nil
-	}
-
-	statusPort := extractStatusPort(sidecar)
-	// Pilot agent statusPort is not defined, skip changing application http probe.
-	if statusPort == -1 {
-		return nil
-	}
-	// Change the application containers' probe to point to sidecar's status port.
-	// TODO: here rewrite the rewriteProbe function in new approach.
-	rewriteProbe := func(probe *corev1.Probe, portMap map[string]int32, path string) *rfc6902PatchOperation {
-		return nil
-		// if probe == nil || probe.HTTPGet == nil {
-		// 	return nil
-		// }
-		// httpGet := proto.Clone(probe.HTTPGet).(*corev1.HTTPGetAction)
-		// // note(incfly): workaround... proto.Clone can't copy corev1.IntOrStr somehow.
-		// httpGet.Port = probe.HTTPGet.Port
-		// header := corev1.HTTPHeader{
-		// 	Name:  status.IstioAppPortHeader,
-		// 	Value: httpGet.Port.String(),
-		// }
-		// // A named port, resolve by looking at port map.
-		// if httpGet.Port.Type == intstr.String {
-		// 	port, exists := portMap[httpGet.Port.StrVal]
-		// 	if !exists {
-		// 		log.Errorf("named port not found in the map skip rewriting probing %v", *probe)
-		// 		return nil
-		// 	}
-		// 	header.Value = strconv.Itoa(int(port))
-		// }
-		// httpGet.HTTPHeaders = append(httpGet.HTTPHeaders, header)
-		// httpGet.Port = intstr.FromInt(statusPort)
-		// return &rfc6902PatchOperation{
-		// 	Op:    "replace",
-		// 	Path:  path,
-		// 	Value: *httpGet,
-		// }
-	}
-	for i, c := range podSpec.Containers {
-		// Skip sidecar container.
-		if c.Name == istioProxyContainerName {
-			continue
-		}
-		portMap := map[string]int32{}
-		for _, p := range c.Ports {
-			portMap[p.Name] = p.ContainerPort
-		}
-		if p := rewriteProbe(c.ReadinessProbe, portMap, fmt.Sprintf("/spec/containers/%v/readinessProbe/httpGet", i)); p != nil {
-			patch = append(patch, *p)
-		}
-		if p := rewriteProbe(c.LivenessProbe, portMap, fmt.Sprintf("/spec/containers/%v/livenessProbe/httpGet", i)); p != nil {
-			patch = append(patch, *p)
-		}
-	}
-	return patch
-}
-
 // extractStatusPort accepts the sidecar container spec and returns its port for healthiness probing.
 func extractStatusPort(sidecar *corev1.Container) int {
 	for i, arg := range sidecar.Args {
@@ -200,27 +82,76 @@ func extractStatusPort(sidecar *corev1.Container) int {
 
 // rewriteProbe changes application containers' probe to point to sidecar's status port.
 func rewriteProbe(probe *corev1.Probe, appProbers *status.KubeAppProbers,
-	newURL string, statusPort int, portMap map[string]int32) {
+	newURL, jsonPath string, statusPort int, portMap map[string]int32) *rfc6902PatchOperation {
 	if probe == nil || probe.HTTPGet == nil {
-		return
+		return nil
 	}
 	httpGet := probe.HTTPGet
-
 	// Save app probe config to pass to pilot agent later.
 	savedProbe := proto.Clone(probe.HTTPGet).(*corev1.HTTPGetAction)
-	(*appProbers)[newURL] = savedProbe
+	if appProbers != nil {
+		(*appProbers)[newURL] = savedProbe
+	}
 	// A named port, resolve by looking at port map.
 	if httpGet.Port.Type == intstr.String {
 		port, exists := portMap[httpGet.Port.StrVal]
 		if !exists {
 			log.Errorf("named port not found in the map skip rewriting probing %v", *probe)
-			return
+			return nil
 		}
 		savedProbe.Port = intstr.FromInt(int(port))
 	}
 	// Change the application csince ontainer prober config.
 	httpGet.Port = intstr.FromInt(statusPort)
 	httpGet.Path = newURL
+	return &rfc6902PatchOperation{
+		Op:    "replace",
+		Path:  jsonPath,
+		Value: *httpGet,
+	}
+}
+
+// createProbeRewritePatch generates the patch for webhook.
+func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) []rfc6902PatchOperation {
+	patch := []rfc6902PatchOperation{}
+	if spec == nil || podSpec == nil || !spec.RewriteAppHTTPProbe {
+		return patch
+	}
+	var sidecar *corev1.Container
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].Name == istioProxyContainerName {
+			sidecar = &podSpec.Containers[i]
+			break
+		}
+	}
+	if sidecar == nil {
+		return nil
+	}
+
+	statusPort := extractStatusPort(sidecar)
+	// Pilot agent statusPort is not defined, skip changing application http probe.
+	if statusPort == -1 {
+		return nil
+	}
+	for i, c := range podSpec.Containers {
+		// Skip sidecar container.
+		if c.Name == istioProxyContainerName {
+			continue
+		}
+		portMap := map[string]int32{}
+		for _, p := range c.Ports {
+			portMap[p.Name] = p.ContainerPort
+		}
+		if p := rewriteProbe(c.ReadinessProbe, nil, fmt.Sprintf("/app-health/%v/readyz", c.Name),
+			fmt.Sprintf("/spec/containers/%v/readinessProbe/httpGet", i), statusPort, portMap); p != nil {
+			patch = append(patch, *p)
+		}
+		if p := rewriteProbe(c.LivenessProbe, nil, fmt.Sprintf("/app-health/%v/livez", c.Name),
+			fmt.Sprintf("/spec/containers/%v/livenessProbe/httpGet", i), statusPort, portMap); p != nil {
+			patch = append(patch, *p)
+		}
+	}
+	return patch
 }
 
 func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
@@ -257,8 +188,8 @@ func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 		for _, p := range c.Ports {
 			portMap[p.Name] = p.ContainerPort
 		}
-		rewriteProbe(c.ReadinessProbe, &appProberInfo, fmt.Sprintf("/app-health/%v/readyz", c.Name), statusPort, portMap)
-		rewriteProbe(c.LivenessProbe, &appProberInfo, fmt.Sprintf("/app-health/%v/livez", c.Name), statusPort, portMap)
+		rewriteProbe(c.ReadinessProbe, &appProberInfo, fmt.Sprintf("/app-health/%v/readyz", c.Name), "", statusPort, portMap)
+		rewriteProbe(c.LivenessProbe, &appProberInfo, fmt.Sprintf("/app-health/%v/livez", c.Name), "", statusPort, portMap)
 	}
 
 	// Finally propagate app prober config to `istio-proxy` through command line flag.

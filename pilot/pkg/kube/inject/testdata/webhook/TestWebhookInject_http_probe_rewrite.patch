@@ -67,43 +67,26 @@
   },
   {
     "op": "replace",
-    "path": "/spec/containers/1/readinessProbe",
+    "path": "/spec/containers/1/readinessProbe/httpGet",
     "value": {
-      "path": "/ready",
-      "port": 15020,
-      "httpHeaders": [
-        {
-          "name": "istio-app-probe-port",
-          "value": "3333"
-        }
-      ]
+      "path": "/app-health/hello/readyz",
+      "port": 15020
     }
   },
   {
     "op": "replace",
-    "path": "/spec/containers/1/livenessProbe",
+    "path": "/spec/containers/1/livenessProbe/httpGet",
     "value": {
-      "path": "/live",
-      "port": 15020,
-      "httpHeaders": [
-        {
-          "name": "istio-app-probe-port",
-          "value": "80"
-        }
-      ]
+      "path": "/app-health/hello/livez",
+      "port": 15020
     }
   },
   {
     "op": "replace",
-    "path": "/spec/containers/2/livenessProbe",
+    "path": "/spec/containers/2/livenessProbe/httpGet",
     "value": {
-      "port": 15020,
-      "httpHeaders": [
-        {
-          "name": "istio-app-probe-port",
-          "value": "9000"
-        }
-      ]
+      "path": "/app-health/second/livez",
+      "port": 15020
     }
   }
 ]
