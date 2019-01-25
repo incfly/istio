@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package inject implements kube-inject or webhoook autoinject feature to inject sidecar.
+// This file is focused on rewriting Kubernetes app probers to support mutual TLS.
 package inject
 
 import (
@@ -80,7 +82,8 @@ func extractStatusPort(sidecar *corev1.Container) int {
 	return -1
 }
 
-func calculateRewrite(probe *corev1.Probe, newURL string, statusPort int) *corev1.HTTPGetAction {
+// convertAppProber returns a overwritten `HTTPGetAction` for pilot agent to take over.
+func convertAppProber(probe *corev1.Probe, newURL string, statusPort int) *corev1.HTTPGetAction {
 	if probe == nil || probe.HTTPGet == nil {
 		return nil
 	}
@@ -91,64 +94,8 @@ func calculateRewrite(probe *corev1.Probe, newURL string, statusPort int) *corev
 	return c
 }
 
-// createProbeRewritePatch generates the patch for webhook.
-// TODO(here): problems, the webhook injector when see a pod, may or maynot have istio-proxy sidecar
-// container there.
-func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) []rfc6902PatchOperation {
-	patch := []rfc6902PatchOperation{}
-	if spec == nil || podSpec == nil || !spec.RewriteAppHTTPProbe {
-		return patch
-	}
-	var sidecar *corev1.Container
-	for i := range spec.Containers {
-		if podSpec.Containers[i].Name == istioProxyContainerName {
-			sidecar = &podSpec.Containers[i]
-			break
-		}
-	}
-	if sidecar == nil {
-		return nil
-	}
-
-	statusPort := extractStatusPort(sidecar)
-	// Pilot agent statusPort is not defined, skip changing application http probe.
-	if statusPort == -1 {
-		return nil
-	}
-	// kubeProbers := &status.KubeAppProbers{}
-	for i, c := range podSpec.Containers {
-		// Skip sidecar container.
-		if c.Name == istioProxyContainerName {
-			continue
-		}
-		portMap := map[string]int32{}
-		for _, p := range c.Ports {
-			portMap[p.Name] = p.ContainerPort
-		}
-		readyz, livez := status.FormatProberURL(c.Name)
-		if after := calculateRewrite(c.ReadinessProbe, readyz, statusPort); after != nil {
-			patch = append(patch, rfc6902PatchOperation{
-				Op:    "replace",
-				Path:  fmt.Sprintf("/spec/containers/%v/readinessProbe/httpGet", i),
-				Value: *after,
-			})
-		}
-		if after := calculateRewrite(c.LivenessProbe, livez, statusPort); after != nil {
-			patch = append(patch, rfc6902PatchOperation{
-				Op:    "replace",
-				Path:  fmt.Sprintf("/spec/containers/%v/livenessProbe/httpGet", i),
-				Value: *after,
-			})
-		}
-	}
-	return patch
-}
-
 // extractKubeAppProbers returns a pointer to the KubeAppProbers.
-// Also update the probers so that all the references to the named port will be resolved to integer.
-// TODO: reasoning as following
-// - we need to update istio-proxy container args.
-// - webhook we append that before we call calculate rewrites.
+// Also update the probers so that all usages of named port will be resolved to integer.
 func extractKubeAppProbers(podspec *corev1.PodSpec) *status.KubeAppProbers {
 	out := status.KubeAppProbers{}
 	updateNamedPort := func(p *corev1.Probe, portMap map[string]int32) *corev1.HTTPGetAction {
@@ -186,6 +133,7 @@ func extractKubeAppProbers(podspec *corev1.PodSpec) *status.KubeAppProbers {
 	return &out
 }
 
+// rewriteAppHTTPProbes modifies the app probers in place for kube-inject.
 func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 	if spec == nil || podSpec == nil {
 		return
@@ -218,10 +166,49 @@ func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 		return
 	}
 	// We don't have to escape json encoding here when using golang libraries.
-	sidecar.Args = append(sidecar.Args, []string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), string(b)}...)
+	sidecar.Args = append(sidecar.Args,
+		[]string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), string(b)}...)
 
 	// Now time to modify the container probers.
 	for _, c := range podSpec.Containers {
+		// Skip sidecar container.
+		if c.Name == istioProxyContainerName {
+			continue
+		}
+		readyz, livez := status.FormatProberURL(c.Name)
+		if hg := convertAppProber(c.ReadinessProbe, readyz, statusPort); hg != nil {
+			*c.ReadinessProbe.HTTPGet = *hg
+		}
+		if hg := convertAppProber(c.LivenessProbe, livez, statusPort); hg != nil {
+			*c.LivenessProbe.HTTPGet = *hg
+		}
+	}
+}
+
+// createProbeRewritePatch generates the patch for webhook.
+func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) []rfc6902PatchOperation {
+	patch := []rfc6902PatchOperation{}
+	if spec == nil || podSpec == nil || !spec.RewriteAppHTTPProbe {
+		return patch
+	}
+	var sidecar *corev1.Container
+	for i := range spec.Containers {
+		if podSpec.Containers[i].Name == istioProxyContainerName {
+			sidecar = &podSpec.Containers[i]
+			break
+		}
+	}
+	if sidecar == nil {
+		return nil
+	}
+
+	statusPort := extractStatusPort(sidecar)
+	// Pilot agent statusPort is not defined, skip changing application http probe.
+	if statusPort == -1 {
+		return nil
+	}
+	// kubeProbers := &status.KubeAppProbers{}
+	for i, c := range podSpec.Containers {
 		// Skip sidecar container.
 		if c.Name == istioProxyContainerName {
 			continue
@@ -231,14 +218,20 @@ func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 			portMap[p.Name] = p.ContainerPort
 		}
 		readyz, livez := status.FormatProberURL(c.Name)
-		after := calculateRewrite(c.ReadinessProbe, readyz, statusPort)
-		if after != nil {
-			*c.ReadinessProbe.HTTPGet = *after
+		if after := convertAppProber(c.ReadinessProbe, readyz, statusPort); after != nil {
+			patch = append(patch, rfc6902PatchOperation{
+				Op:    "replace",
+				Path:  fmt.Sprintf("/spec/containers/%v/readinessProbe/httpGet", i),
+				Value: *after,
+			})
 		}
-		after = calculateRewrite(c.LivenessProbe, livez, statusPort)
-		if after != nil {
-			*c.LivenessProbe.HTTPGet = *after
+		if after := convertAppProber(c.LivenessProbe, livez, statusPort); after != nil {
+			patch = append(patch, rfc6902PatchOperation{
+				Op:    "replace",
+				Path:  fmt.Sprintf("/spec/containers/%v/livenessProbe/httpGet", i),
+				Value: *after,
+			})
 		}
 	}
-
+	return patch
 }
