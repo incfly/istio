@@ -80,32 +80,59 @@ func extractStatusPort(sidecar *corev1.Container) int {
 	return -1
 }
 
-// calculateRewrite returns a copy of the original and the expected HTTPGetProber config after injection.
+// calculateRewrite returns a pointer to the HTTPGetAction.
 func calculateRewrite(probe *corev1.Probe, newURL string,
-	statusPort int, portMap map[string]int32) (original, after *corev1.HTTPGetAction) {
+	statusPort int, portMap map[string]int32, kubeProbers *status.KubeAppProbers) *corev1.HTTPGetAction {
 	if probe == nil || probe.HTTPGet == nil {
-		return nil, nil
+		return nil
 	}
 	copyProber := func() *corev1.HTTPGetAction {
 		c := proto.Clone(probe.HTTPGet).(*corev1.HTTPGetAction)
 		c.Port = probe.HTTPGet.Port
 		return c
 	}
-	original = copyProber()
-	after = copyProber()
+	original := copyProber()
+	after := copyProber()
 	// A named port, resolve by looking at port map.
 	if original.Port.Type == intstr.String {
 		port, exists := portMap[original.Port.StrVal]
 		if !exists {
 			log.Errorf("named port not found in the map skip rewriting probing %v", *probe)
-			return nil, nil
+			return after
+		}
+		original.Port = intstr.FromInt(int(port))
+	}
+	(*kubeProbers)[newURL] = original
+	// Change the application container prober config.
+	after.Port = intstr.FromInt(statusPort)
+	after.Path = newURL
+	return after
+}
+
+func calculateRewrite2(probe *corev1.Probe, newURL string, statusPort int, portMap map[string]int32) *corev1.HTTPGetAction {
+	if probe == nil || probe.HTTPGet == nil {
+		return nil
+	}
+	copyProber := func() *corev1.HTTPGetAction {
+		c := proto.Clone(probe.HTTPGet).(*corev1.HTTPGetAction)
+		c.Port = probe.HTTPGet.Port
+		return c
+	}
+	original := copyProber()
+	after := copyProber()
+	// A named port, resolve by looking at port map.
+	if original.Port.Type == intstr.String {
+		port, exists := portMap[original.Port.StrVal]
+		if !exists {
+			log.Errorf("named port not found in the map skip rewriting probing %v", *probe)
+			return after
 		}
 		original.Port = intstr.FromInt(int(port))
 	}
 	// Change the application container prober config.
 	after.Port = intstr.FromInt(statusPort)
 	after.Path = newURL
-	return original, after
+	return after
 }
 
 // createProbeRewritePatch generates the patch for webhook.
@@ -117,7 +144,7 @@ func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec
 		return patch
 	}
 	var sidecar *corev1.Container
-	for i := range podSpec.Containers {
+	for i := range spec.Containers {
 		if podSpec.Containers[i].Name == istioProxyContainerName {
 			sidecar = &podSpec.Containers[i]
 			break
@@ -132,6 +159,7 @@ func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec
 	if statusPort == -1 {
 		return nil
 	}
+	kubeProbers := &status.KubeAppProbers{}
 	for i, c := range podSpec.Containers {
 		// Skip sidecar container.
 		if c.Name == istioProxyContainerName {
@@ -141,16 +169,16 @@ func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec
 		for _, p := range c.Ports {
 			portMap[p.Name] = p.ContainerPort
 		}
-		if _, after := calculateRewrite(c.ReadinessProbe, fmt.Sprintf("/app-health/%v/readyz", c.Name),
-			statusPort, portMap); after != nil {
+		if after := calculateRewrite(c.ReadinessProbe, fmt.Sprintf("/app-health/%v/readyz", c.Name),
+			statusPort, portMap, kubeProbers); after != nil {
 			patch = append(patch, rfc6902PatchOperation{
 				Op:    "replace",
 				Path:  fmt.Sprintf("/spec/containers/%v/readinessProbe/httpGet", i),
 				Value: *after,
 			})
 		}
-		if _, after := calculateRewrite(c.LivenessProbe, fmt.Sprintf("/app-health/%v/livez", c.Name),
-			statusPort, portMap); after != nil {
+		if after := calculateRewrite(c.LivenessProbe, fmt.Sprintf("/app-health/%v/livez", c.Name),
+			statusPort, portMap, kubeProbers); after != nil {
 			patch = append(patch, rfc6902PatchOperation{
 				Op:    "replace",
 				Path:  fmt.Sprintf("/spec/containers/%v/livenessProbe/httpGet", i),
@@ -159,11 +187,38 @@ func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec
 		}
 	}
 
-	// TODO: also here, need to add a patch to update the command line flags.
+	// TODO: add a patch to add a args flag, [--kubeAppHTTPProbers=xxx] kubeProbers.
+	// patch = append(patch, rfc6902PatchOperation{
+	// 	Op:    "append",
+	// 	Path:  fmt.Sprintf("/spec/containers/%v/args/-"),
+	// 	Value: *kubeProbers,
+	// })
 	return patch
 }
 
-func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
+// extractKubeAppProbers returns a pointer to the KubeAppProbers.
+// Also update the probers so that all the references to the named port will be resolved to integer.
+// TODO: reasoning as following
+// - we need to update istio-proxy container args.
+// - webhook we append that before we call calculate rewrites.
+func extractKubeAppProbers(podspec *corev1.PodSpec) *status.KubeAppProbers {
+	probers := status.KubeAppProbers{}
+	for _, c := range podspec.Containers {
+		if c.ReadinessProbe == nil || c.ReadinessProbe.HTTPGet == nil {
+			continue
+		}
+		// portMap := map[string]int{}
+		ha := proto.Clone(c.ReadinessProbe.HTTPGet).(*corev1.HTTPGetAction)
+		// TODO here.
+		if c.ReadinessProbe.HTTPGet.Port.Type == intstr.String {
+		}
+		ha.Port = c.ReadinessProbe.HTTPGet.Port
+		probers[fmt.Sprintf("/app-health/%v/readyz", c.Name)] = ha
+	}
+	return &probers
+}
+
+func rewriteAppHTTPProbe2(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 	if spec == nil || podSpec == nil {
 		return
 	}
@@ -198,15 +253,13 @@ func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 			portMap[p.Name] = p.ContainerPort
 		}
 		newURL := fmt.Sprintf("/app-health/%v/readyz", c.Name)
-		before, after := calculateRewrite(c.ReadinessProbe, newURL, statusPort, portMap)
+		after := calculateRewrite(c.ReadinessProbe, newURL, statusPort, portMap, &appProberInfo)
 		if after != nil {
-			appProberInfo[newURL] = before
 			*c.ReadinessProbe.HTTPGet = *after
 		}
 		newURL = fmt.Sprintf("/app-health/%v/livez", c.Name)
-		before, after = calculateRewrite(c.LivenessProbe, newURL, statusPort, portMap)
+		after = calculateRewrite(c.LivenessProbe, newURL, statusPort, portMap, &appProberInfo)
 		if after != nil {
-			appProberInfo[newURL] = before
 			*c.LivenessProbe.HTTPGet = *after
 		}
 	}
@@ -219,4 +272,66 @@ func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 	}
 	// We don't have to escape json encoding here when using golang libraries.
 	sidecar.Args = append(sidecar.Args, []string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), string(b)}...)
+}
+
+func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
+	if spec == nil || podSpec == nil {
+		return
+	}
+	if !spec.RewriteAppHTTPProbe {
+		return
+	}
+	var sidecar *corev1.Container
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].Name == istioProxyContainerName {
+			sidecar = &podSpec.Containers[i]
+			break
+		}
+	}
+	if sidecar == nil {
+		return
+	}
+
+	statusPort := extractStatusPort(sidecar)
+	// Pilot agent statusPort is not defined, skip changing application http probe.
+	if statusPort == -1 {
+		return
+	}
+
+	appProberInfo := extractKubeAppProbers(podSpec)
+	// Nothing to rewrite.
+	if appProberInfo == nil {
+		return
+	}
+	// Finally propagate app prober config to `istio-proxy` through command line flag.
+	b, err := json.Marshal(appProberInfo)
+	if err != nil {
+		log.Errorf("failed to serialize the app prober config %v", err)
+		return
+	}
+	// We don't have to escape json encoding here when using golang libraries.
+	sidecar.Args = append(sidecar.Args, []string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), string(b)}...)
+
+	// Now time to modify the container probers.
+	for _, c := range podSpec.Containers {
+		// Skip sidecar container.
+		if c.Name == istioProxyContainerName {
+			continue
+		}
+		portMap := map[string]int32{}
+		for _, p := range c.Ports {
+			portMap[p.Name] = p.ContainerPort
+		}
+		newURL := fmt.Sprintf("/app-health/%v/readyz", c.Name)
+		after := calculateRewrite2(c.ReadinessProbe, newURL, statusPort, portMap)
+		if after != nil {
+			*c.ReadinessProbe.HTTPGet = *after
+		}
+		newURL = fmt.Sprintf("/app-health/%v/livez", c.Name)
+		after = calculateRewrite2(c.LivenessProbe, newURL, statusPort, portMap)
+		if after != nil {
+			*c.LivenessProbe.HTTPGet = *after
+		}
+	}
+
 }
