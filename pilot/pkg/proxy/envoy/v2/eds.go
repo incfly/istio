@@ -113,8 +113,10 @@ func buildEnvoyLbEndpoint(UID string, family model.AddressFamily, address string
 	}
 
 	ep := &endpoint.LbEndpoint{
-		Endpoint: &endpoint.Endpoint{
-			Address: &addr,
+		HostIdentifier: &endpoint.LbEndpoint_Endpoint{
+			Endpoint: &endpoint.Endpoint{
+				Address: &addr,
+			},
 		},
 	}
 
@@ -133,8 +135,10 @@ func networkEndpointToEnvoyEndpoint(e *model.NetworkEndpoint) (*endpoint.LbEndpo
 	}
 	addr := util.GetNetworkEndpointAddress(e)
 	ep := &endpoint.LbEndpoint{
-		Endpoint: &endpoint.Endpoint{
-			Address: &addr,
+		HostIdentifier: &endpoint.LbEndpoint_Endpoint{
+			Endpoint: &endpoint.Endpoint{
+				Address: &addr,
+			},
 		},
 	}
 
@@ -446,7 +450,7 @@ func (s *DiscoveryServer) SvcUpdate(cluster, hostname string, ports map[string]u
 
 // Update clusters for an incremental EDS push, and initiate the push.
 // Only clusters that changed are updated/pushed.
-func (s *DiscoveryServer) edsIncremental(version string, push *model.PushContext, edsUpdates map[string]*EndpointShards) {
+func (s *DiscoveryServer) edsIncremental(version string, push *model.PushContext, edsUpdates map[string]struct{}) {
 	adsLog.Infof("XDS:EDSInc Pushing %s Services: %v, "+
 		"ConnectedEndpoints: %d", version, edsUpdates, adsClientCount())
 	t0 := time.Now()
@@ -458,7 +462,7 @@ func (s *DiscoveryServer) edsIncremental(version string, push *model.PushContext
 	cMap := make(map[string]map[model.Locality]*EdsCluster, len(edsClusters))
 	for k, v := range edsClusters {
 		_, _, hostname, _ := model.ParseSubsetKey(k)
-		if edsUpdates[string(hostname)] == nil {
+		if _, ok := edsUpdates[string(hostname)]; !ok {
 			// Cluster was not updated, skip recomputing.
 			continue
 		}
@@ -483,7 +487,7 @@ func (s *DiscoveryServer) edsIncremental(version string, push *model.PushContext
 }
 
 // WorkloadUpdate is called when workload labels/annotations are updated.
-func (s *DiscoveryServer) WorkloadUpdate(id string, labels map[string]string, annotations map[string]string) {
+func (s *DiscoveryServer) WorkloadUpdate(id string, labels map[string]string, _ map[string]string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -497,8 +501,7 @@ func (s *DiscoveryServer) WorkloadUpdate(id string, labels map[string]string, an
 		// First time this workload has been seen. Likely never connected, no need to
 		// push
 		s.WorkloadsByID[id] = &Workload{
-			Labels:      labels,
-			Annotations: annotations,
+			Labels: labels,
 		}
 		return
 	}
@@ -573,7 +576,7 @@ func (s *DiscoveryServer) edsUpdate(shard, serviceName string,
 	ep.mutex.Lock()
 	ep.Shards[shard] = istioEndpoints
 	ep.mutex.Unlock()
-	s.edsUpdates[serviceName] = ep
+	s.edsUpdates[serviceName] = struct{}{}
 
 	// for internal update: this called by DiscoveryServer.Push --> updateServiceShards,
 	// no need to trigger push here.
@@ -624,18 +627,18 @@ func connectionID(node string) string {
 
 // pushEds is pushing EDS updates for a single connection. Called the first time
 // a client connects, for incremental updates and for full periodic updates.
-func (s *DiscoveryServer) pushEds(push *model.PushContext, con *XdsConnection,
-	full bool, edsUpdatedServices map[string]*EndpointShards) error {
+func (s *DiscoveryServer) pushEds(push *model.PushContext, con *XdsConnection, edsUpdatedServices map[string]struct{}) error {
 	loadAssignments := []*xdsapi.ClusterLoadAssignment{}
-
 	emptyClusters := 0
 	endpoints := 0
 
 	for _, clusterName := range con.Clusters {
 		_, _, hostname, _ := model.ParseSubsetKey(clusterName)
-		if edsUpdatedServices != nil && edsUpdatedServices[string(hostname)] == nil {
-			// Cluster was not updated, skip recomputing.
-			continue
+		if edsUpdatedServices != nil {
+			if _, ok := edsUpdatedServices[string(hostname)]; !ok {
+				// Cluster was not updated, skip recomputing.
+				continue
+			}
 		}
 
 		c := s.getEdsCluster(con.modelNode, clusterName)
@@ -687,7 +690,7 @@ func (s *DiscoveryServer) pushEds(push *model.PushContext, con *XdsConnection,
 	}
 	pushes.With(prometheus.Labels{"type": "eds"}).Add(1)
 
-	if full {
+	if edsUpdatedServices == nil {
 		adsLog.Debugf("EDS: PUSH for %s clusters %d endpoints %d empty %d",
 			con.ConID, len(con.Clusters), endpoints, emptyClusters)
 	} else {
