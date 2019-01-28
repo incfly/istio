@@ -36,6 +36,7 @@ import (
 
 	meshconfig "istio.io/api/mesh/v1alpha1"
 	"istio.io/istio/pilot/cmd"
+	"istio.io/istio/pilot/cmd/pilot-agent/status"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pkg/log"
 )
@@ -436,25 +437,25 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 	patch = append(patch, removeImagePullSecrets(pod.Spec.ImagePullSecrets, prevStatus.ImagePullSecrets, "/spec/imagePullSecrets")...)
 
 	if appProbers := extractKubeAppProbers(&pod.Spec); appProbers != nil {
-		// b, err := json.Marshal(appProbers)
-		// if err != nil {
-		// 	log.Errorf("failed to serialize the app prober config %v", err)
-		// 	return nil, fmt.Errorf("failed to serialize app prober config %v", err)
-		// }
-		// TODO: here see if the sic is used again and again... might need to make a copy if so...
-		// We don't have to escape json encoding here when using golang libraries.
-		// sidecar.Args = append(sidecar.Args,
-		// 	[]string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), string(b)}...)
-		// var sidecar *corev1.Container
-		// for i := range sic.Containers {
-		// 	if sic.Containers[i].Name == istioProxyContainerName {
-		// 		sidecar = &sic.Containers[i].
-		// 		break
-		// 	}
-		// }
-		// if sidecar == nil {
-		// 	return nil, nil
-		// }
+		b, err := json.Marshal(appProbers)
+		if err != nil {
+			log.Errorf("failed to serialize the app prober config %v", err)
+			return nil, fmt.Errorf("failed to serialize app prober config %v", err)
+		}
+		var sidecar *corev1.Container
+		for i := range sic.Containers {
+			if sic.Containers[i].Name == istioProxyContainerName {
+				sidecar = &sic.Containers[i]
+				break
+			}
+		}
+		if sidecar != nil {
+			log.Errorf("Not found sidecar container, skip adding k8s app prober config")
+			// TODO: here see if the sic is used again and again... might need to make a copy if so...
+			// We don't have to escape json encoding here when using golang libraries.
+			sidecar.Args = append(sidecar.Args,
+				[]string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), string(b)}...)
+		}
 	}
 
 	patch = append(patch, addContainer(pod.Spec.InitContainers, sic.InitContainers, "/spec/initContainers")...)
