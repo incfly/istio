@@ -444,6 +444,11 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 		if !rewrite {
 			return
 		}
+		sidecar := FindSidecar(sic.Containers)
+		if sidecar == nil {
+			log.Errorf("sidecar not found in the template, skip addAppProberCmd")
+			return
+		}
 		appProbers := extractKubeAppProbers(&pod.Spec)
 		if appProbers == nil {
 			log.Errorf("skip addAppProberCmd, app pod does not need rewrite")
@@ -452,17 +457,6 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 		b, err := json.Marshal(appProbers)
 		if err != nil {
 			log.Errorf("failed to serialize app prober config %v", err)
-			return
-		}
-		var sidecar *corev1.Container
-		for i := range sic.Containers {
-			if sic.Containers[i].Name == istioProxyContainerName {
-				sidecar = &sic.Containers[i]
-				break
-			}
-		}
-		if sidecar == nil {
-			log.Errorf("sidecar not found in the template, skip addAppProberCmd")
 			return
 		}
 		// TODO: here see if the sic is used again and again... might need to make a copy if so...

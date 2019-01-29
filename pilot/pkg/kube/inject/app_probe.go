@@ -59,6 +59,16 @@ func ShouldRewriteAppProbers(spec *SidecarInjectionSpec) bool {
 	return true
 }
 
+// FindSidecar returns the pointer to the first container whose name matches the "istio-proxy".
+func FindSidecar(containers []corev1.Container) *corev1.Container {
+	for i := range containers {
+		if containers[i].Name == istioProxyContainerName {
+			return &containers[i]
+		}
+	}
+	return nil
+}
+
 // extractStatusPort accepts the sidecar container spec and returns its port for healthiness probing.
 func extractStatusPort(sidecar *corev1.Container) int {
 	for i, arg := range sidecar.Args {
@@ -147,19 +157,10 @@ func extractKubeAppProbers(podspec *corev1.PodSpec) *status.KubeAppProbers {
 
 // rewriteAppHTTPProbes modifies the app probers in place for kube-inject.
 func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
-	if spec == nil || podSpec == nil {
+	if !ShouldRewriteAppProbers(spec) {
 		return
 	}
-	if !spec.RewriteAppHTTPProbe {
-		return
-	}
-	var sidecar *corev1.Container
-	for i := range podSpec.Containers {
-		if podSpec.Containers[i].Name == istioProxyContainerName {
-			sidecar = &podSpec.Containers[i]
-			break
-		}
-	}
+	sidecar := FindSidecar(podSpec.Containers)
 	if sidecar == nil {
 		return
 	}
@@ -171,7 +172,6 @@ func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 	}
 
 	appProberInfo := extractKubeAppProbers(podSpec)
-	// Finally propagate app prober config to `istio-proxy` through command line flag.
 	b, err := json.Marshal(appProberInfo)
 	if err != nil {
 		log.Errorf("failed to serialize the app prober config %v", err)
@@ -199,21 +199,14 @@ func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 
 // createProbeRewritePatch generates the patch for webhook.
 func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) []rfc6902PatchOperation {
+	if !ShouldRewriteAppProbers(spec) {
+		return []rfc6902PatchOperation{}
+	}
 	patch := []rfc6902PatchOperation{}
-	if spec == nil || podSpec == nil || !spec.RewriteAppHTTPProbe {
-		return patch
-	}
-	var sidecar *corev1.Container
-	for i := range spec.Containers {
-		if spec.Containers[i].Name == istioProxyContainerName {
-			sidecar = &spec.Containers[i]
-			break
-		}
-	}
+	sidecar := FindSidecar(spec.Containers)
 	if sidecar == nil {
 		return nil
 	}
-
 	statusPort := extractStatusPort(sidecar)
 	// Pilot agent statusPort is not defined, skip changing application http probe.
 	if statusPort == -1 {
