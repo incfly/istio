@@ -36,9 +36,6 @@ const (
 	// We reuse it for taking over application's readiness probing as well.
 	// TODO: replace the hardcoded statusPort elsewhere by this variable as much as possible.
 	StatusPortCmdFlagName = "statusPort"
-
-	// TODO: any constant refers to this container's name?
-	istioProxyContainerName = "istio-proxy"
 )
 
 var (
@@ -62,7 +59,7 @@ func ShouldRewriteAppProbers(spec *SidecarInjectionSpec) bool {
 // FindSidecar returns the pointer to the first container whose name matches the "istio-proxy".
 func FindSidecar(containers []corev1.Container) *corev1.Container {
 	for i := range containers {
-		if containers[i].Name == istioProxyContainerName {
+		if containers[i].Name == ProxyContainerName {
 			return &containers[i]
 		}
 	}
@@ -116,9 +113,9 @@ func convertAppProber(probe *corev1.Probe, newURL string, statusPort int) *corev
 	return c
 }
 
-// extractKubeAppProbers returns a pointer to the KubeAppProbers.
+// DumpAppProbers returns a json encoded string as `status.KubeAppProbers`.
 // Also update the probers so that all usages of named port will be resolved to integer.
-func extractKubeAppProbers(podspec *corev1.PodSpec) *status.KubeAppProbers {
+func DumpAppProbers(podspec *corev1.PodSpec) string {
 	out := status.KubeAppProbers{}
 	updateNamedPort := func(p *corev1.Probe, portMap map[string]int32) *corev1.HTTPGetAction {
 		if p == nil || p.HTTPGet == nil {
@@ -152,7 +149,12 @@ func extractKubeAppProbers(podspec *corev1.PodSpec) *status.KubeAppProbers {
 			out[livez] = h
 		}
 	}
-	return &out
+	b, err := json.Marshal(out)
+	if err != nil {
+		log.Errorf("failed to serialize the app prober config %v", err)
+		return ""
+	}
+	return string(b)
 }
 
 // rewriteAppHTTPProbes modifies the app probers in place for kube-inject.
@@ -170,21 +172,15 @@ func rewriteAppHTTPProbe(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec) {
 	if statusPort == -1 {
 		return
 	}
-
-	appProberInfo := extractKubeAppProbers(podSpec)
-	b, err := json.Marshal(appProberInfo)
-	if err != nil {
-		log.Errorf("failed to serialize the app prober config %v", err)
-		return
+	if prober := DumpAppProbers(podSpec); prober != "" {
+		// We don't have to escape json encoding here when using golang libraries.
+		sidecar.Args = append(sidecar.Args,
+			[]string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), prober}...)
 	}
-	// We don't have to escape json encoding here when using golang libraries.
-	sidecar.Args = append(sidecar.Args,
-		[]string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), string(b)}...)
-
-	// Now time to modify the container probers.
+	// Now modify the container probers.
 	for _, c := range podSpec.Containers {
 		// Skip sidecar container.
-		if c.Name == istioProxyContainerName {
+		if c.Name == ProxyContainerName {
 			continue
 		}
 		readyz, livez := status.FormatProberURL(c.Name)
