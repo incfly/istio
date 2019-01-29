@@ -47,6 +47,18 @@ var (
 	statusPortPattern = regexp.MustCompile(fmt.Sprintf(`^-{1,2}%s(=(?P<port>\d+))?$`, StatusPortCmdFlagName))
 )
 
+// ShouldRewriteAppProbers returns if we should rewrite apps' probers config.
+func ShouldRewriteAppProbers(spec *SidecarInjectionSpec) bool {
+	if spec == nil {
+		return false
+	}
+	if !spec.RewriteAppHTTPProbe {
+		return false
+	}
+	// TODO: check statusPort is defined, sidecar exists, per deployment annotation, etc.
+	return true
+}
+
 // extractStatusPort accepts the sidecar container spec and returns its port for healthiness probing.
 func extractStatusPort(sidecar *corev1.Container) int {
 	for i, arg := range sidecar.Args {

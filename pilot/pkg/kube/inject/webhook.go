@@ -436,11 +436,20 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 	patch = append(patch, removeVolumes(pod.Spec.Volumes, prevStatus.Volumes, "/spec/volumes")...)
 	patch = append(patch, removeImagePullSecrets(pod.Spec.ImagePullSecrets, prevStatus.ImagePullSecrets, "/spec/imagePullSecrets")...)
 
-	if appProbers := extractKubeAppProbers(&pod.Spec); appProbers != nil {
+	rewrite := ShouldRewriteAppProbers(sic)
+	addAppProberCmd := func() {
+		if !rewrite {
+			return
+		}
+		appProbers := extractKubeAppProbers(&pod.Spec)
+		if appProbers == nil {
+			log.Errorf("skip addAppProberCmd, app pod does not need rewrite")
+			return
+		}
 		b, err := json.Marshal(appProbers)
 		if err != nil {
-			log.Errorf("failed to serialize the app prober config %v", err)
-			return nil, fmt.Errorf("failed to serialize app prober config %v", err)
+			log.Errorf("failed to serialize app prober config %v", err)
+			return
 		}
 		var sidecar *corev1.Container
 		for i := range sic.Containers {
@@ -449,14 +458,16 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 				break
 			}
 		}
-		if sidecar != nil {
-			log.Errorf("Not found sidecar container, skip adding k8s app prober config")
-			// TODO: here see if the sic is used again and again... might need to make a copy if so...
-			// We don't have to escape json encoding here when using golang libraries.
-			sidecar.Args = append(sidecar.Args,
-				[]string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), string(b)}...)
+		if sidecar == nil {
+			log.Errorf("sidecar not found in the template, skip addAppProberCmd")
+			return
 		}
+		// TODO: here see if the sic is used again and again... might need to make a copy if so...
+		// We don't have to escape json encoding here when using golang libraries.
+		sidecar.Args = append(sidecar.Args,
+			[]string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), string(b)}...)
 	}
+	addAppProberCmd()
 
 	patch = append(patch, addContainer(pod.Spec.InitContainers, sic.InitContainers, "/spec/initContainers")...)
 	patch = append(patch, addContainer(pod.Spec.Containers, sic.Containers, "/spec/containers")...)
@@ -469,8 +480,9 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 
 	patch = append(patch, updateAnnotation(pod.Annotations, annotations)...)
 
-	// Rewrite the application http probe if needed.
-	patch = append(patch, createProbeRewritePatch(&pod.Spec, sic)...)
+	if rewrite {
+		patch = append(patch, createProbeRewritePatch(&pod.Spec, sic)...)
+	}
 
 	return json.Marshal(patch)
 }
