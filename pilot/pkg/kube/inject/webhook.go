@@ -437,9 +437,6 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 	patch = append(patch, removeImagePullSecrets(pod.Spec.ImagePullSecrets, prevStatus.ImagePullSecrets, "/spec/imagePullSecrets")...)
 
 	rewrite := ShouldRewriteAppProbers(sic)
-	fmt.Println("jianfeih debug createPatch is invoked")
-	log.Infof("jianfeih debug createPatch is invoked1")
-	log.Errorf("jianfeih debug createPatch is invoked1")
 	addAppProberCmd := func() {
 		if !rewrite {
 			return
@@ -449,20 +446,12 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 			log.Errorf("sidecar not found in the template, skip addAppProberCmd")
 			return
 		}
-		appProbers := extractKubeAppProbers(&pod.Spec)
-		if appProbers == nil {
-			log.Errorf("skip addAppProberCmd, app pod does not need rewrite")
-			return
-		}
-		b, err := json.Marshal(appProbers)
-		if err != nil {
-			log.Errorf("failed to serialize app prober config %v", err)
-			return
+		if prober := DumpAppProbers(&pod.Spec); prober != "" {
+			sidecar.Args = append(sidecar.Args,
+				[]string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), prober}...)
 		}
 		// TODO: here see if the sic is used again and again... might need to make a copy if so...
 		// We don't have to escape json encoding here when using golang libraries.
-		sidecar.Args = append(sidecar.Args,
-			[]string{fmt.Sprintf("--%v", status.KubeAppProberCmdFlagName), string(b)}...)
 	}
 	addAppProberCmd()
 
@@ -478,9 +467,7 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 	patch = append(patch, updateAnnotation(pod.Annotations, annotations)...)
 
 	if rewrite {
-		pic := createProbeRewritePatch(&pod.Spec, sic)
-		fmt.Println("jianfeih debug pic ", pic)
-		patch = append(patch, pic...)
+		patch = append(patch, createProbeRewritePatch(&pod.Spec, sic)...)
 	}
 
 	return json.Marshal(patch)

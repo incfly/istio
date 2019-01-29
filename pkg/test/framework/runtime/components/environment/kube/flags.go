@@ -43,7 +43,6 @@ func init() {
 		"Helm chart dir for Istio. Only valid when deploying Istio.")
 	flag.StringVar(&globalSettings.ValuesFile, "istio.test.kube.helm.valuesFile", globalSettings.ValuesFile,
 		"Helm values file. This can be an absolute path or relative to chartDir. Only valid when deploying Istio.")
-	// TODO(incfly): here is where we override the helm values.
 	flag.StringVar(&helmValues, "istio.test.kube.helm.values", helmValues,
 		"Manual overrides for Helm values file. Only valid when deploying Istio.")
 }
