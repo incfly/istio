@@ -205,8 +205,8 @@ func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec
 	}
 	var sidecar *corev1.Container
 	for i := range spec.Containers {
-		if podSpec.Containers[i].Name == istioProxyContainerName {
-			sidecar = &podSpec.Containers[i]
+		if spec.Containers[i].Name == istioProxyContainerName {
+			sidecar = &spec.Containers[i]
 			break
 		}
 	}
@@ -219,7 +219,6 @@ func createProbeRewritePatch(podSpec *corev1.PodSpec, spec *SidecarInjectionSpec
 	if statusPort == -1 {
 		return nil
 	}
-	// kubeProbers := &status.KubeAppProbers{}
 	for i, c := range podSpec.Containers {
 		// Skip sidecar container.
 		if c.Name == istioProxyContainerName {

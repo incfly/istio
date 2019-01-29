@@ -437,6 +437,9 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 	patch = append(patch, removeImagePullSecrets(pod.Spec.ImagePullSecrets, prevStatus.ImagePullSecrets, "/spec/imagePullSecrets")...)
 
 	rewrite := ShouldRewriteAppProbers(sic)
+	fmt.Println("jianfeih debug createPatch is invoked")
+	log.Infof("jianfeih debug createPatch is invoked1")
+	log.Errorf("jianfeih debug createPatch is invoked1")
 	addAppProberCmd := func() {
 		if !rewrite {
 			return
@@ -481,7 +484,9 @@ func createPatch(pod *corev1.Pod, prevStatus *SidecarInjectionStatus, annotation
 	patch = append(patch, updateAnnotation(pod.Annotations, annotations)...)
 
 	if rewrite {
-		patch = append(patch, createProbeRewritePatch(&pod.Spec, sic)...)
+		pic := createProbeRewritePatch(&pod.Spec, sic)
+		fmt.Println("jianfeih debug pic ", pic)
+		patch = append(patch, pic...)
 	}
 
 	return json.Marshal(patch)

@@ -31,10 +31,10 @@ import (
 
 // TestMtlsHealthCheck verifies Kubernetes HTTP health check can work when mTLS
 // is enabled.
-// go test -v ./tests/integration2/pilot/security -run="TestMtlsHealthCheck" -istio.test.env  \
-// kubernetes -istio.test.kube.helm.values \
-// "sidecarInjectorWebhook.rewriteAppHTTPProbe=true,global.hub=gcr.io/jianfeih-test,global.tag=0115a"  \
-// --istio.test.kube.testNamespace istio-test   | tee -a somefile
+// go test -v ./tests/integration2/pilot/security -run="TestMtlsHealthCheck" -istio.test.env  kubernetes \
+// -istio.test.kube.helm.values "sidecarInjectorWebhook.rewriteAppHTTPProbe=true,global.hub=gcr.io/jianfeih-test,global.tag=${TAG}"  \
+// --istio.test.kube.testNamespace istio-test   --log_output_level CI:info | tee -a somefile
+
 func TestMtlsHealthCheck(t *testing.T) {
 	ctx := framework.GetContext(t)
 	ctx.RequireOrSkip(t, lifecycle.Test, &descriptors.KubernetesEnvironment)
@@ -60,6 +60,11 @@ spec:
 	}
 
 	// Deploy app now.
+	// TODO(incfly): next step for integration test istio.io/istio/pkg/test/framework/runtime/components/apps/kube.go
+	// Allow ourselves to on demand generate apps, modifying on existing app yaml does not work.
+	// Changes compared to existing:
+	// - Declare readiness probe http
+	// - Declare service port for 3333 or other service.
 	ctx.RequireOrFail(t, lifecycle.Test, &descriptors.Apps)
 	apps := components.GetApps(ctx, t)
 	apps.GetAppOrFail("a", t)
