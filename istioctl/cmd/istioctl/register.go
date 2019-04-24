@@ -34,7 +34,28 @@ var (
 			ip := args[1]
 			portsListStr := args[2:]
 			portsList := make([]kube.NamedPort, len(portsListStr))
-			register.GetServiceEntry()
+			ports, err := register.ConverPortList(portsListStr)
+			if err != nil {
+				log.Errorf("failed to convert port list %v", err)
+			}
+			opts := &register.VMServiceOpts{
+				Name:        svcName,
+				PortList:    ports,
+				IP:          []string{ip},
+				Annotations: annotations,
+			}
+			se, err := register.GetServiceEntry(opts)
+			if err != nil {
+				// something error
+			}
+			// do something about service entry.
+			svc, err := register.GetKubernetesService(opts)
+			if err != nil {
+				//
+			}
+			if err := register.Apply(se, svc); err != nil {
+				log.Errorf("failed to create service enetry and k8s svc.")
+			}
 			for i := range portsListStr {
 				p, err := kube.Str2NamedPort(portsListStr[i])
 				if err != nil {
