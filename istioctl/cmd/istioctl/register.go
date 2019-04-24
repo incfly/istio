@@ -19,6 +19,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"istio.io/istio/istioctl/pkg/register"
 	"istio.io/istio/pilot/pkg/serviceregistry/kube"
 	"istio.io/istio/pkg/log"
 )
@@ -33,6 +34,7 @@ var (
 			ip := args[1]
 			portsListStr := args[2:]
 			portsList := make([]kube.NamedPort, len(portsListStr))
+			register.GetServiceEntry()
 			for i := range portsListStr {
 				p, err := kube.Str2NamedPort(portsListStr[i])
 				if err != nil {
