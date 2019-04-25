@@ -38,11 +38,13 @@ var (
 			if err != nil {
 				log.Errorf("failed to convert port list %v", err)
 			}
+			ns, _ := handleNamespaces(namespace)
 			opts := &register.VMServiceOpts{
-				Name:        svcName,
-				PortList:    ports,
-				IP:          []string{ip},
-				Annotations: annotations,
+				Name:           svcName,
+				Namespace:      ns,
+				PortList:       ports,
+				IP:             []string{ip},
+				ServiceAccount: "default",
 			}
 			se, err := register.GetServiceEntry(opts)
 			if err != nil {
@@ -74,7 +76,6 @@ var (
 			if err != nil {
 				return err
 			}
-			ns, _ := handleNamespaces(namespace)
 			return kube.RegisterEndpoint(client, ns, svcName, ip, portsList, labels, annotations)
 		},
 	}
