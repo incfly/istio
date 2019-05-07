@@ -8,6 +8,20 @@ import (
 	"istio.io/api/networking/v1alpha3"
 )
 
+var (
+	output = `{
+  "hosts": [
+    "httpbin-vm.default.svc.cluster.local"
+  ],
+  "resolution": 1,
+  "endpoints": [
+    {
+      "address": "10.0.0.1"
+    }
+  ]
+}`
+)
+
 func TestGetServiceEntry(t *testing.T) {
 	opt := &VMServiceOpts{
 		Name:           "vmhttp",

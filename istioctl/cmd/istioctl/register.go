@@ -17,10 +17,10 @@ package main
 import (
 	"fmt"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/spf13/cobra"
 
 	"istio.io/istio/istioctl/pkg/register"
-	"istio.io/istio/pilot/pkg/serviceregistry/kube"
 	"istio.io/istio/pkg/log"
 )
 
@@ -33,10 +33,13 @@ var (
 			svcName := args[0]
 			ip := args[1]
 			portsListStr := args[2:]
-			portsList := make([]kube.NamedPort, len(portsListStr))
 			ports, err := register.ConverPortList(portsListStr)
 			if err != nil {
 				log.Errorf("failed to convert port list %v", err)
+			}
+			client, err := createInterface(kubeconfig)
+			if err != nil {
+				return err
 			}
 			ns, _ := handleNamespaces(namespace)
 			opts := &register.VMServiceOpts{
@@ -48,35 +51,18 @@ var (
 			}
 			se, err := register.GetServiceEntry(opts)
 			if err != nil {
-				// something error
+				return err
 			}
 			// do something about service entry.
 			svc, err := register.GetKubernetesService(opts)
 			if err != nil {
-				//
-			}
-			if err := register.Apply(se, svc); err != nil {
-				log.Errorf("failed to create service enetry and k8s svc.")
-			}
-			for i := range portsListStr {
-				p, err := kube.Str2NamedPort(portsListStr[i])
-				if err != nil {
-					return err
-				}
-				portsList[i] = p
-			}
-			log.Infof("Registering for service '%s' ip '%s', ports list %v",
-				svcName, ip, portsList)
-			if svcAcctAnn != "" {
-				annotations = append(annotations, fmt.Sprintf("%s=%s", kube.KubeServiceAccountsOnVMAnnotation, svcAcctAnn))
-			}
-			log.Infof("%d labels (%v) and %d annotations (%v)",
-				len(labels), labels, len(annotations), annotations)
-			client, err := createInterface(kubeconfig)
-			if err != nil {
 				return err
 			}
-			return kube.RegisterEndpoint(client, ns, svcName, ip, portsList, labels, annotations)
+			fmt.Printf("jianfeih debug \n%+v\n%+v\n", proto.MarshalTextString(svc), proto.MarshalTextString(se))
+			if err := register.Apply(client, kubeconfig, ns, se, svc); err != nil {
+				log.Errorf("failed to create service enetry and k8s svc: %v", err)
+			}
+			return nil
 		},
 	}
 	labels      []string
