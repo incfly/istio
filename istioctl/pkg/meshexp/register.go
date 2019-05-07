@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// VMServiceOpts contains the options of a mesh exapnsion VM service.
+// VMServiceOpts contains the options of a mesh exapnsion service running on VM.
 type VMServiceOpts struct {
 	Name           string
 	Namespace      string
@@ -25,8 +25,10 @@ type VMServiceOpts struct {
 }
 
 // ConverPortList converst a list of string to the `model.PortList`.
+// TODO: here, ensure the protocol does not change, and use unique name with different suffix.
 func ConverPortList(ports []string) (model.PortList, error) {
 	portList := model.PortList{}
+	// portNameMap := map[protocol]
 	for _, p := range ports {
 		np, err := kube_registry.Str2NamedPort(p)
 		if err != nil {
@@ -42,7 +44,7 @@ func ConverPortList(ports []string) (model.PortList, error) {
 
 // GetServiceEntry returns a service entry for mesh expansion service.
 // TODO(incfly): change to model.Config such that the metadata is also included.
-func GetServiceEntry(vs *VMServiceOpts) (*v1alpha3.ServiceEntry, error) {
+func GetServiceEntry(vs *VMServiceOpts) (*model.Config, error) {
 	if vs == nil {
 		return nil, fmt.Errorf("empty vm service options")
 	}
@@ -62,11 +64,21 @@ func GetServiceEntry(vs *VMServiceOpts) (*v1alpha3.ServiceEntry, error) {
 		})
 	}
 	host := fmt.Sprintf("%v.%v.svc.cluster.local", vs.Name, vs.Namespace)
-	return &v1alpha3.ServiceEntry{
-		Hosts:      []string{host},
-		Ports:      ports,
-		Endpoints:  eps,
-		Resolution: v1alpha3.ServiceEntry_STATIC,
+	return &model.Config{
+		ConfigMeta: model.ConfigMeta{
+			Type:      model.ServiceEntry.Type,
+			Group:     model.ServiceEntry.Group,
+			Version:   model.ServiceEntry.Version,
+			Name:      ResourceName(vs.Name),
+			Namespace: vs.Namespace,
+			Domain:    model.IstioAPIGroupDomain,
+		},
+		Spec: &v1alpha3.ServiceEntry{
+			Hosts:      []string{host},
+			Ports:      ports,
+			Endpoints:  eps,
+			Resolution: v1alpha3.ServiceEntry_STATIC,
+		},
 	}, nil
 }
 
@@ -96,50 +108,33 @@ func GetKubernetesService(vs *VMServiceOpts) (*corev1.Service, error) {
 	}, nil
 }
 
-// ServiceEntryName returns the service entry crd name.
-func ServiceEntryName(hostShortName string) string {
+// ResourceName returns the name we assigned for k8s service and service entry.
+func ResourceName(hostShortName string) string {
 	return fmt.Sprintf("mesh-expansion-%v", hostShortName)
 }
 
 // Add creates service entry and kubernetes service object in order to register vm service.
-func Add(client kubernetes.Interface, kubecfg, ns string,
-	se *v1alpha3.ServiceEntry, svc *corev1.Service) error {
-	// args.Config.ControllerOptions.DomainSuffix)
+func Add(client kubernetes.Interface, seClient *crd.Client, ns string,
+	se *model.Config, svc *corev1.Service) error {
 	if se == nil || svc == nil {
 		return fmt.Errorf("failed to create vm service")
 	}
-	configClient, err := crd.NewClient(kubecfg, "", model.ConfigDescriptor{model.ServiceEntry}, "istio.io")
-	if err != nil {
-		return fmt.Errorf("failed to init client, check kubeconfig is provided %v", err)
-	}
 	// Pre-check Kubernetes service and service entry does not exist.
-	_, err = client.CoreV1().Services(ns).Get(svc.Name, metav1.GetOptions{
+	_, err := client.CoreV1().Services(ns).Get(svc.Name, metav1.GetOptions{
 		IncludeUninitialized: true,
 	})
 	if err == nil {
 		return fmt.Errorf("service already exists, skip")
 	}
-	seName := ServiceEntryName(svc.Name)
-	if oldServiceEntry := configClient.Get(
-		model.ServiceEntry.Type, seName, ns); oldServiceEntry != nil {
+	if oldServiceEntry := seClient.Get(
+		model.ServiceEntry.Type, se.ConfigMeta.Name, ns); oldServiceEntry != nil {
 		return fmt.Errorf("service entry already exists, skip")
 	}
 	// Create Kubernetes service and service entry.
 	if _, err := client.CoreV1().Services(ns).Create(svc); err != nil {
 		return fmt.Errorf("failed to create kuberenetes service %v", err)
 	}
-	config := model.Config{
-		ConfigMeta: model.ConfigMeta{
-			Type:      model.ServiceEntry.Type,
-			Group:     model.ServiceEntry.Group,
-			Version:   model.ServiceEntry.Version,
-			Name:      seName,
-			Namespace: ns,
-			Domain:    model.IstioAPIGroupDomain,
-		},
-		Spec: se,
-	}
-	if _, err := configClient.Create(config); err != nil {
+	if _, err := seClient.Create(*se); err != nil {
 		return fmt.Errorf("failed to create service entry %v", err)
 	}
 	return nil

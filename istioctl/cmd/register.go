@@ -15,10 +15,16 @@
 package cmd
 
 import (
+	"fmt"
+
+	"github.com/gogo/protobuf/proto"
 	"github.com/spf13/cobra"
 
 	"istio.io/istio/istioctl/pkg/meshexp"
+	"istio.io/istio/pilot/pkg/config/kube/crd"
+	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pkg/log"
+	"k8s.io/client-go/kubernetes"
 )
 
 var (
@@ -27,22 +33,46 @@ var (
 	svcAcctAnn  string
 )
 
+func createClients() (kubernetes.Interface, *crd.Client, error) {
+	client, err := createInterface(kubeconfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	seClient, err := crd.NewClient(
+		kubeconfig, configContext,
+		model.ConfigDescriptor{model.ServiceEntry},
+		model.IstioAPIGroupDomain)
+	if err != nil {
+		return nil, nil, err
+	}
+	return client, seClient, nil
+}
+
 func register() *cobra.Command {
 	registerCmd := &cobra.Command{
-		Use:   "register <svcname> <ip> [name1:]port1 [name2:]port2 ...",
-		Short: "Registers a service instance (e.g. VM) joining the mesh",
-		Args:  cobra.MinimumNArgs(3),
+		Use:   "register <svcname> <ip> [protocol:]port1 [protocol:]port2 ...",
+		Short: "Register a service instance (e.g. VM) joining the mesh",
+		Long: `register creates Kuberentes services and ServiceEntry for mesh expansion services.
+
+For example
+Create a http service listening on port 8080, hosting on a VM with address as 10.0.0.1
+	istioctl register httpbin-vm 10.0.0.1 http:8080
+
+Create a service with three ports and in namespace foo, with service account bar:
+	istioctl register http-grpc-vm 10.0.0.1 http:8080 grpc:9090 http:9000 -n foo -s bar
+`,
+		Args: cobra.MinimumNArgs(3),
 		RunE: func(c *cobra.Command, args []string) error {
+			client, seClient, err := createClients()
+			if err != nil {
+				return fmt.Errorf("failed to create client, check kubeconfig,kubecontext are correct, %v", err)
+			}
 			svcName := args[0]
 			ip := args[1]
 			portsListStr := args[2:]
 			ports, err := meshexp.ConverPortList(portsListStr)
 			if err != nil {
-				log.Errorf("failed to convert port list %v", err)
-			}
-			client, err := createInterface(kubeconfig)
-			if err != nil {
-				return err
+				return fmt.Errorf("failed to convert port list %v", err)
 			}
 			ns, _ := handleNamespaces(namespace)
 			opts := &meshexp.VMServiceOpts{
@@ -50,7 +80,7 @@ func register() *cobra.Command {
 				Namespace:      ns,
 				PortList:       ports,
 				IP:             []string{ip},
-				ServiceAccount: "default",
+				ServiceAccount: svcAcctAnn,
 			}
 			se, err := meshexp.GetServiceEntry(opts)
 			if err != nil {
@@ -60,8 +90,8 @@ func register() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// fmt.Printf("jianfeih debug \n%+v\n%+v\n", proto.MarshalTextString(svc), proto.MarshalTextString(se))
-			if err := meshexp.Add(client, kubeconfig, ns, se, svc); err != nil {
+			fmt.Printf("jianfeih debug \n%+v\n%+v\n", proto.MarshalTextString(svc), proto.MarshalTextString(se.Spec))
+			if err := meshexp.Add(client, seClient, ns, se, svc); err != nil {
 				log.Errorf("failed to create service enetry and k8s svc: %v", err)
 			}
 			return nil
