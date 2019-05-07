@@ -288,6 +288,7 @@ func (s *DiscoveryServer) updateServiceShards(push *model.PushContext) error {
 	// TODO: if ServiceDiscovery is aggregate, and all members support direct, use
 	// the direct interface.
 	var registries []aggregate.Registry
+	var nonK8sRegistries []aggregate.Registry
 	if agg, ok := s.Env.ServiceDiscovery.(*aggregate.Controller); ok {
 		registries = agg.GetRegistries()
 	} else {
@@ -298,13 +299,16 @@ func (s *DiscoveryServer) updateServiceShards(push *model.PushContext) error {
 		}
 	}
 
-	// hostname --> service account
-	svc2account := map[string]map[string]bool{}
+	for _, registry := range registries {
+		if registry.Name != serviceregistry.KubernetesRegistry {
+			nonK8sRegistries = append(nonK8sRegistries, registry)
+		}
+	}
 
 	// Each registry acts as a shard - we don't want to combine them because some
 	// may individually update their endpoints incrementally
 	for _, svc := range push.Services(nil) {
-		for _, registry := range registries {
+		for _, registry := range nonK8sRegistries {
 			// in case this svc does not belong to the registry
 			if svc, _ := registry.GetService(svc.Hostname); svc == nil {
 				continue
@@ -336,36 +340,12 @@ func (s *DiscoveryServer) updateServiceShards(push *model.PushContext) error {
 						Locality:        ep.GetLocality(),
 						LbWeight:        ep.Endpoint.LbWeight,
 					})
-					if ep.ServiceAccount != "" {
-						account, f := svc2account[hostname]
-						if !f {
-							account = map[string]bool{}
-							svc2account[hostname] = account
-						}
-						account[ep.ServiceAccount] = true
-					}
 				}
 			}
 
 			s.edsUpdate(registry.ClusterID, hostname, entries, true)
 		}
 	}
-
-	s.mutex.Lock()
-	for k, v := range svc2account {
-		if ep := s.EndpointShardsByService[k]; ep != nil {
-			ep.ServiceAccounts = v
-			continue
-		}
-		// we have not seen this service before.
-		// We will let edsUpdate() add endpoints to the list.
-		// Just record service accounts here.
-		s.EndpointShardsByService[k] = &EndpointShards{
-			Shards:          map[string][]*model.IstioEndpoint{},
-			ServiceAccounts: v,
-		}
-	}
-	s.mutex.Unlock()
 
 	return nil
 }
@@ -475,7 +455,6 @@ func (s *DiscoveryServer) edsIncremental(version string, push *model.PushContext
 func (s *DiscoveryServer) WorkloadUpdate(id string, labels map[string]string, _ map[string]string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-
 	if labels == nil {
 		// No push needed - the Endpoints object will also be triggered.
 		delete(s.WorkloadsByID, id)
@@ -483,10 +462,34 @@ func (s *DiscoveryServer) WorkloadUpdate(id string, labels map[string]string, _ 
 	}
 	w, f := s.WorkloadsByID[id]
 	if !f {
-		// First time this workload has been seen. Likely never connected, no need to
-		// push
 		s.WorkloadsByID[id] = &Workload{
 			Labels: labels,
+		}
+
+		fullPush := false
+		adsClientsMutex.RLock()
+		for _, connection := range adsClients {
+			// if the workload has envoy proxy and connected to server,
+			// then do a full xDS push for this proxy;
+			// otherwise:
+			//   case 1: the workload has no sidecar proxy, no need xDS push at all.
+			//   case 2: the workload xDS connection has not been established,
+			//           also no need to trigger a full push here.
+			if connection.modelNode.IPAddresses[0] == id {
+				fullPush = true
+			}
+		}
+		adsClientsMutex.RUnlock()
+
+		if fullPush {
+			// First time this workload has been seen. Maybe after the first connect,
+			// do a full push for this proxy in the next push epoch.
+			s.proxyUpdatesMutex.Lock()
+			if s.proxyUpdates == nil {
+				s.proxyUpdates = make(map[string]struct{})
+			}
+			s.proxyUpdates[id] = struct{}{}
+			s.proxyUpdatesMutex.Unlock()
 		}
 		return
 	}
@@ -564,12 +567,19 @@ func (s *DiscoveryServer) edsUpdate(shard, serviceName string,
 	// updates containing the full list of endpoints for the service in that cluster.
 	for _, e := range istioEndpoints {
 		if e.ServiceAccount != "" {
+			ep.mutex.Lock()
 			_, f = ep.ServiceAccounts[e.ServiceAccount]
+			if !f {
+				ep.ServiceAccounts[e.ServiceAccount] = true
+			}
+			ep.mutex.Unlock()
+
 			if !f && !internal {
 				// The entry has a service account that was not previously associated.
 				// Requires a CDS push and full sync.
 				adsLog.Infof("Endpoint updating service account %s %s", e.ServiceAccount, serviceName)
 				requireFull = true
+				break
 			}
 		}
 	}

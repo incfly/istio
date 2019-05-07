@@ -76,6 +76,7 @@ var (
 	controlPlaneAuthPolicy     string
 	customConfigFile           string
 	proxyLogLevel              string
+	proxyComponentLogLevel     string
 	concurrency                int
 	templateFile               string
 	disableInternalTelemetry   bool
@@ -142,7 +143,9 @@ var (
 				role.IPAddresses = append(role.IPAddresses, "127.0.0.1")
 				role.IPAddresses = append(role.IPAddresses, "::1")
 			}
-
+			// Check if proxy runs in ipv4 or ipv6 environment to set Envoy's
+			// operational parameters correctly.
+			proxyIPv6 := isIPv6Proxy(role.IPAddresses)
 			if len(role.ID) == 0 {
 				if registry == serviceregistry.KubernetesRegistry {
 					role.ID = podNameVar.Get() + "." + podNamespaceVar.Get()
@@ -310,7 +313,16 @@ var (
 					opts := make(map[string]string)
 					opts["PodName"] = podNameVar.Get()
 					opts["PodNamespace"] = podNamespaceVar.Get()
-
+					// Setting default to ipv4 local host, wildcard and dns policy
+					opts["localhost"] = "127.0.0.1"
+					opts["wildcard"] = "0.0.0.0"
+					opts["dns_lookup_family"] = "V4_ONLY"
+					// Check if nodeIP carries IPv4 or IPv6 and set up proxy accordingly
+					if proxyIPv6 {
+						opts["localhost"] = "::1"
+						opts["wildcard"] = "::"
+						opts["dns_lookup_family"] = "AUTO"
+					}
 					mixerSAN := getSAN(ns, envoy.MixerSvcAccName, role.MixerIdentity)
 					log.Infof("MixerSAN %#v", mixerSAN)
 					if len(mixerSAN) > 1 {
@@ -359,9 +371,13 @@ var (
 				if err != nil {
 					return err
 				}
-
+				localHostAddr := "127.0.0.1"
+				if proxyIPv6 {
+					localHostAddr = "[::1]"
+				}
 				prober := kubeAppProberNameVar.Get()
 				statusServer, err := status.NewServer(status.Config{
+					LocalHostAddr:      localHostAddr,
 					AdminPort:          proxyAdminPort,
 					StatusPort:         statusPort,
 					ApplicationPorts:   parsedPorts,
@@ -375,7 +391,7 @@ var (
 
 			log.Infof("PilotSAN %#v", pilotSAN)
 
-			envoyProxy := envoy.NewProxy(proxyConfig, role.ServiceNode(), proxyLogLevel, pilotSAN, role.IPAddresses)
+			envoyProxy := envoy.NewProxy(proxyConfig, role.ServiceNode(), proxyLogLevel, proxyComponentLogLevel, pilotSAN, role.IPAddresses)
 			agent := proxy.NewAgent(envoyProxy, proxy.DefaultRetry, pilot.TerminationDrainDuration())
 			watcher := envoy.NewWatcher(tlsCertsToWatch, agent.ConfigCh())
 
@@ -545,6 +561,9 @@ func init() {
 	proxyCmd.PersistentFlags().StringVar(&proxyLogLevel, "proxyLogLevel", "warning",
 		fmt.Sprintf("The log level used to start the Envoy proxy (choose from {%s, %s, %s, %s, %s, %s, %s})",
 			"trace", "debug", "info", "warning", "error", "critical", "off"))
+	// See https://www.envoyproxy.io/docs/envoy/latest/operations/cli#cmdoption-component-log-level
+	proxyCmd.PersistentFlags().StringVar(&proxyComponentLogLevel, "proxyComponentLogLevel", "misc:error",
+		"The component log level used to start the Envoy proxy")
 	proxyCmd.PersistentFlags().IntVar(&concurrency, "concurrency", int(values.Concurrency),
 		"number of worker threads to run")
 	proxyCmd.PersistentFlags().StringVar(&templateFile, "templateFile", "",
@@ -621,4 +640,21 @@ func main() {
 		log.Errora(err)
 		os.Exit(-1)
 	}
+}
+
+// isIPv6Proxy check the addresses slice and returns true for a valid IPv6 address
+// for all other cases it returns false
+func isIPv6Proxy(ipAddrs []string) bool {
+	for i := 0; i < len(ipAddrs); i++ {
+		addr := net.ParseIP(ipAddrs[i])
+		if addr == nil {
+			// Should not happen, invalid IP in proxy's IPAddresses slice should have been caught earlier,
+			// skip it to prevent a panic.
+			continue
+		}
+		if addr.To4() != nil {
+			return false
+		}
+	}
+	return true
 }
