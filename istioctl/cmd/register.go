@@ -15,12 +15,9 @@
 package cmd
 
 import (
-	"fmt"
-
-	"github.com/gogo/protobuf/proto"
 	"github.com/spf13/cobra"
 
-	"istio.io/istio/istioctl/pkg/register"
+	"istio.io/istio/istioctl/pkg/meshexp"
 	"istio.io/istio/pkg/log"
 )
 
@@ -39,7 +36,7 @@ func register() *cobra.Command {
 			svcName := args[0]
 			ip := args[1]
 			portsListStr := args[2:]
-			ports, err := register.ConverPortList(portsListStr)
+			ports, err := meshexp.ConverPortList(portsListStr)
 			if err != nil {
 				log.Errorf("failed to convert port list %v", err)
 			}
@@ -48,24 +45,23 @@ func register() *cobra.Command {
 				return err
 			}
 			ns, _ := handleNamespaces(namespace)
-			opts := &register.VMServiceOpts{
+			opts := &meshexp.VMServiceOpts{
 				Name:           svcName,
 				Namespace:      ns,
 				PortList:       ports,
 				IP:             []string{ip},
 				ServiceAccount: "default",
 			}
-			se, err := register.GetServiceEntry(opts)
+			se, err := meshexp.GetServiceEntry(opts)
 			if err != nil {
 				return err
 			}
-			// do something about service entry.
-			svc, err := register.GetKubernetesService(opts)
+			svc, err := meshexp.GetKubernetesService(opts)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("jianfeih debug \n%+v\n%+v\n", proto.MarshalTextString(svc), proto.MarshalTextString(se))
-			if err := register.Apply(client, kubeconfig, ns, se, svc); err != nil {
+			// fmt.Printf("jianfeih debug \n%+v\n%+v\n", proto.MarshalTextString(svc), proto.MarshalTextString(se))
+			if err := meshexp.Add(client, kubeconfig, ns, se, svc); err != nil {
 				log.Errorf("failed to create service enetry and k8s svc: %v", err)
 			}
 			return nil

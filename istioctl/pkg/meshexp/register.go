@@ -1,5 +1,5 @@
-// Package register implements mesh expansion service registry for istioctl.
-package register
+// Package meshexp implements mesh expansion service registry for istioctl.
+package meshexp
 
 import (
 	"fmt"
@@ -101,8 +101,8 @@ func ServiceEntryName(hostShortName string) string {
 	return fmt.Sprintf("mesh-expansion-%v", hostShortName)
 }
 
-// Apply creates service entry and kubernetes service object in order to register vm service.
-func Apply(client kubernetes.Interface, kubecfg, ns string,
+// Add creates service entry and kubernetes service object in order to register vm service.
+func Add(client kubernetes.Interface, kubecfg, ns string,
 	se *v1alpha3.ServiceEntry, svc *corev1.Service) error {
 	// args.Config.ControllerOptions.DomainSuffix)
 	if se == nil || svc == nil {
