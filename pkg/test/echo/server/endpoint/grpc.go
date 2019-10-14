@@ -28,6 +28,7 @@ import (
 
 	"istio.io/istio/pkg/test/echo/common"
 	"istio.io/istio/pkg/test/echo/common/response"
+	"istio.io/istio/pkg/test/echo/common/scheme"
 	"istio.io/istio/pkg/test/echo/proto"
 	"istio.io/istio/pkg/test/echo/server/forwarder"
 	"istio.io/istio/pkg/test/util/retry"
@@ -86,12 +87,18 @@ func (s *grpcInstance) awaitReady(onReady OnReadyFunc, listener net.Listener) {
 	defer onReady()
 
 	err := retry.UntilSuccess(func() error {
+		sh := scheme.GRPC
+		if s.UseTLS() {
+			sh = scheme.GRPCS
+		}
 		f, err := forwarder.New(forwarder.Config{
 			Request: &proto.ForwardEchoRequest{
-				Url:           "grpc://" + listener.Addr().String(),
+				Url:           fmt.Sprintf("%s://%s", sh, listener.Addr().String()),
 				Message:       "hello",
 				TimeoutMicros: common.DurationToMicros(readyInterval),
 			},
+			TLSCert: s.TLSCert,
+			// TLSKey:  s.TLSKey,
 		})
 		defer func() {
 			_ = f.Close()

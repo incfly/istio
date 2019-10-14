@@ -91,6 +91,9 @@ func newProtocol(cfg Config) (protocol, error) {
 
 		// transport security
 		security := grpc.WithInsecure()
+
+		// TODO:incfly here, issue is about x509 no any ip san, returned addr might be 127.0.0.1
+		// might need regenerate the keycert...
 		if scheme.Instance(u.Scheme) == scheme.GRPCS {
 			creds, err := credentials.NewClientTLSFromFile(cfg.TLSCert, authority)
 			if err != nil {

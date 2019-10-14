@@ -17,7 +17,9 @@ package endpoint
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -67,7 +69,6 @@ func (s *httpInstance) Start(onReady OnReadyFunc) error {
 			Config: s.Config,
 		},
 	}
-
 	var listener net.Listener
 	var port int
 	var err error
@@ -94,7 +95,12 @@ func (s *httpInstance) Start(onReady OnReadyFunc) error {
 
 	// Start serving HTTP traffic.
 	go func() {
-		_ = s.server.Serve(listener)
+		if s.TLSCert != "" && s.TLSKey != "" {
+			fmt.Printf("Serving TLS traffic, %v %v\n", s.TLSCert, s.TLSKey)
+			_ = s.server.ServeTLS(listener, s.TLSCert, s.TLSKey)
+		} else {
+			_ = s.server.Serve(listener)
+		}
 	}()
 
 	// Notify the WaitGroup once the port has transitioned to ready.
@@ -112,19 +118,33 @@ func (s *httpInstance) awaitReady(onReady OnReadyFunc, port int) {
 
 	client := http.Client{}
 	var url string
+	scheme := "http"
+	if s.UseTLS() {
+		scheme = "https"
+	}
 	if s.isUDS() {
-		url = "http://unix/" + s.UDSServer
+		url = fmt.Sprintf("%v://unix/%v", scheme, s.UDSServer)
 		client.Transport = &http.Transport{
 			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
 				return net.Dial("unix", s.UDSServer)
 			},
 		}
 	} else {
-		url = fmt.Sprintf("http://127.0.0.1:%d", port)
+		url = fmt.Sprintf("%v://127.0.0.1:%d", scheme, port)
 	}
 
 	err := retry.UntilSuccess(func() error {
-		resp, err := http.Get(url)
+		tr := &http.Transport{
+			MaxIdleConns:    10,
+			IdleConnTimeout: 30 * time.Second,
+		}
+		if s.UseTLS() {
+			tr.TLSClientConfig = &tls.Config{
+				InsecureSkipVerify: true, // test only, self-signed cert, no need verify.
+			}
+		}
+		client := &http.Client{Transport: tr}
+		resp, err := client.Get(url)
 		if err != nil {
 			return err
 		}
@@ -133,7 +153,9 @@ func (s *httpInstance) awaitReady(onReady OnReadyFunc, port int) {
 		// server won't become ready until all endpoints (including this one) report
 		// ready, the handler will return 503. This means that the endpoint is now ready.
 		if resp.StatusCode != http.StatusServiceUnavailable {
-			return fmt.Errorf("unexpected status code %d", resp.StatusCode)
+			body, err := ioutil.ReadAll(resp.Body)
+			return fmt.Errorf("unexpected status code %d\nbody:%v\n err:\n%v\n",
+				resp.StatusCode, string(body), err)
 		}
 
 		// Server is up now, we're ready.
@@ -141,7 +163,7 @@ func (s *httpInstance) awaitReady(onReady OnReadyFunc, port int) {
 	}, retry.Timeout(readyTimeout), retry.Delay(readyInterval))
 
 	if err != nil {
-		log.Errorf("readiness failed for endpoint %s: %v", url, err)
+		log.Errorf("HTTP readiness failed for endpoint %s: %v", url, err)
 	} else {
 		log.Infof("ready for HTTP endpoint %s", url)
 	}

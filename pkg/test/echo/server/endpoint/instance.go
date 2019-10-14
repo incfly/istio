@@ -40,6 +40,10 @@ type Config struct {
 	Port          *model.Port
 }
 
+func (c *Config) UseTLS() bool {
+	return c.TLSCert != "" && c.TLSKey != ""
+}
+
 // Instance of an endpoint that serves the Echo application on a single port/protocol.
 type Instance interface {
 	io.Closer
