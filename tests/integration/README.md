@@ -483,8 +483,9 @@ When running tests, only one environment can be specified. Currently, the framew
 
 ### Native Environment (Default)
 
-The test binaries run on the native platform either in-memory, or as processes. This is the default, however you can
-also explicitly specify the native environment:
+The test binaries run on the native platform either in-memory, or as processes, or as a Docker image
+, for example, Envoy sidecar. This is the default, however you can also explicitly specify the
+native environment:
 
 ```console
 $ go test ./... -istio.test.env native

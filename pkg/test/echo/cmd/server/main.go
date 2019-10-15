@@ -30,12 +30,13 @@ import (
 )
 
 var (
-	httpPorts []int
-	grpcPorts []int
-	uds       string
-	version   string
-	crt       string
-	key       string
+	httpPorts  []int
+	httpsPorts []int
+	grpcPorts  []int
+	uds        string
+	version    string
+	crt        string
+	key        string
 
 	loggingOptions = log.DefaultOptions()
 
@@ -52,6 +53,14 @@ var (
 				ports[portIndex] = &model.Port{
 					Name:     "http-" + strconv.Itoa(i),
 					Protocol: protocol.HTTP,
+					Port:     p,
+				}
+				portIndex++
+			}
+			for i, p := range httpsPorts {
+				ports[portIndex] = &model.Port{
+					Name:     "https-" + strconv.Itoa(i),
+					Protocol: protocol.HTTPS,
 					Port:     p,
 				}
 				portIndex++
@@ -98,11 +107,12 @@ func configureLogging(_ *cobra.Command, _ []string) error {
 
 func init() {
 	rootCmd.PersistentFlags().IntSliceVar(&httpPorts, "port", []int{8080}, "HTTP/1.1 ports")
+	rootCmd.PersistentFlags().IntSliceVar(&httpsPorts, "https", []int{8443}, "HTTPS/1.1 ports")
 	rootCmd.PersistentFlags().IntSliceVar(&grpcPorts, "grpc", []int{7070}, "GRPC ports")
 	rootCmd.PersistentFlags().StringVar(&uds, "uds", "", "HTTP server on unix domain socket")
 	rootCmd.PersistentFlags().StringVar(&version, "version", "", "Version string")
-	rootCmd.PersistentFlags().StringVar(&crt, "crt", "", "http and gRPC TLS server-side certificate")
-	rootCmd.PersistentFlags().StringVar(&key, "key", "", "http and gRPC TLS server-side key")
+	rootCmd.PersistentFlags().StringVar(&crt, "crt", "", "HTTPS server-side TLS certificate")
+	rootCmd.PersistentFlags().StringVar(&key, "key", "", "HTTPS server-side TLS key")
 
 	loggingOptions.AttachCobraFlags(rootCmd)
 

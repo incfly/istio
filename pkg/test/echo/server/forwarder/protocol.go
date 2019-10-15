@@ -90,17 +90,9 @@ func newProtocol(cfg Config) (protocol, error) {
 		authority := headers.Get(hostHeader)
 
 		// transport security
+		// TODO(incfly): enable the TLS for gRPC service when needed.
+		// Create transport security credential from certificate.
 		security := grpc.WithInsecure()
-
-		// TODO:incfly here, issue is about x509 no any ip san, returned addr might be 127.0.0.1
-		// might need regenerate the keycert...
-		if scheme.Instance(u.Scheme) == scheme.GRPCS {
-			creds, err := credentials.NewClientTLSFromFile(cfg.TLSCert, authority)
-			if err != nil {
-				log.Fatalf("failed to load client certs %s %v", cfg.TLSCert, err)
-			}
-			security = grpc.WithTransportCredentials(creds)
-		}
 
 		// Strip off the scheme from the address.
 		address := rawURL[len(u.Scheme+"://"):]

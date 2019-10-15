@@ -23,7 +23,7 @@ import (
 	"strconv"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	// "google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 
 	"istio.io/istio/pkg/test/echo/common"
@@ -58,16 +58,8 @@ func (s *grpcInstance) Start(onReady OnReadyFunc) error {
 	s.Port.Port = p
 	fmt.Printf("Listening GRPC on %v\n", p)
 
-	if s.TLSCert != "" && s.TLSKey != "" {
-		// Create the TLS credentials
-		creds, errCreds := credentials.NewServerTLSFromFile(s.TLSCert, s.TLSKey)
-		if errCreds != nil {
-			log.Errorf("could not load TLS keys: %s", errCreds)
-		}
-		s.server = grpc.NewServer(grpc.Creds(creds))
-	} else {
-		s.server = grpc.NewServer()
-	}
+	//ABC
+	s.server = grpc.NewServer()
 	proto.RegisterEchoTestServiceServer(s.server, &grpcHandler{
 		Config: s.Config,
 	})
@@ -88,17 +80,12 @@ func (s *grpcInstance) awaitReady(onReady OnReadyFunc, listener net.Listener) {
 
 	err := retry.UntilSuccess(func() error {
 		sh := scheme.GRPC
-		if s.UseTLS() {
-			sh = scheme.GRPCS
-		}
 		f, err := forwarder.New(forwarder.Config{
 			Request: &proto.ForwardEchoRequest{
 				Url:           fmt.Sprintf("%s://%s", sh, listener.Addr().String()),
 				Message:       "hello",
 				TimeoutMicros: common.DurationToMicros(readyInterval),
 			},
-			TLSCert: s.TLSCert,
-			// TLSKey:  s.TLSKey,
 		})
 		defer func() {
 			_ = f.Close()

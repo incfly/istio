@@ -32,6 +32,7 @@ import (
 
 	"istio.io/istio/pkg/test/echo/common"
 	"istio.io/istio/pkg/test/echo/common/response"
+	"istio.io/istio/pkg/test/echo/common/scheme"
 	"istio.io/istio/pkg/test/util/retry"
 	"istio.io/pkg/log"
 )
@@ -118,19 +119,19 @@ func (s *httpInstance) awaitReady(onReady OnReadyFunc, port int) {
 
 	client := http.Client{}
 	var url string
-	scheme := "http"
+	sh := scheme.HTTP
 	if s.UseTLS() {
-		scheme = "https"
+		sh = scheme.HTTPS
 	}
 	if s.isUDS() {
-		url = fmt.Sprintf("%v://unix/%v", scheme, s.UDSServer)
+		url = fmt.Sprintf("%v://unix/%v", sh, s.UDSServer)
 		client.Transport = &http.Transport{
 			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
 				return net.Dial("unix", s.UDSServer)
 			},
 		}
 	} else {
-		url = fmt.Sprintf("%v://127.0.0.1:%d", scheme, port)
+		url = fmt.Sprintf("%v://127.0.0.1:%d", sh, port)
 	}
 
 	err := retry.UntilSuccess(func() error {

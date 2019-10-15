@@ -35,6 +35,10 @@ func EchoConfig(name string, ns namespace.Instance, headless bool, annos echo.An
 				Protocol: protocol.HTTP,
 			},
 			{
+				Name:     "https",
+				Protocol: protocol.HTTPS,
+			},
+			{
 				Name:     "tcp",
 				Protocol: protocol.TCP,
 			},
