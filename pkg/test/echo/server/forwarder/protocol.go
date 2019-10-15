@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,7 +28,6 @@ import (
 	"github.com/gorilla/websocket"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 
 	"istio.io/istio/pkg/test/echo/common"
 	"istio.io/istio/pkg/test/echo/common/scheme"
