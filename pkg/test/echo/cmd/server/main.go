@@ -47,7 +47,7 @@ var (
 		Long:              `Echo application for testing Istio E2E`,
 		PersistentPreRunE: configureLogging,
 		Run: func(cmd *cobra.Command, args []string) {
-			ports := make(model.PortList, len(httpPorts)+len(grpcPorts))
+			ports := make(model.PortList, len(httpPorts)+len(httpsPorts)+len(grpcPorts))
 			portIndex := 0
 			for i, p := range httpPorts {
 				ports[portIndex] = &model.Port{

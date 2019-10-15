@@ -24,6 +24,12 @@ import (
 	"istio.io/istio/tests/integration/security/util/reachability"
 )
 
+// TODO(incfly): schedule
+// A->B (https) succeed always, always include.
+// echo component changes,
+// Might need some changs on client app to be able to call server with https.
+// test changes;
+
 // This test verifies reachability under different authN scenario:
 // - app A to app B using mTLS.
 // - app A to app B using mTLS-permissive.
