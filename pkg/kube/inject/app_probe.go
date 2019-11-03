@@ -105,20 +105,22 @@ func extractStatusPort(sidecar *corev1.Container) int {
 }
 
 // convertAppProber returns a overwritten `HTTPGetAction` for pilot agent to take over.
-func convertAppProber(probe *corev1.Probe, newURL string, statusPort int) *corev1.HTTPGetAction {
+func convertAppProber(probe *corev1.Probe, newURL string, statusPort int) *corev1.Probe {
 	if probe == nil || probe.HTTPGet == nil {
 		return nil
 	}
-	c := probe.HTTPGet.DeepCopy()
+	c := probe.DeepCopy()
 	// Change the application container prober config.
-	c.Port = intstr.FromInt(statusPort)
-	c.Path = newURL
+	c.HTTPGet.Port = intstr.FromInt(statusPort)
+	c.HTTPGet.Path = newURL
 	// For HTTPS prober, we change to HTTP,
 	// and pilot agent uses https to request application prober endpoint.
 	// Kubelet -> HTTP -> Pilot Agent -> HTTPS -> Application
-	if c.Scheme == corev1.URISchemeHTTPS {
-		c.Scheme = corev1.URISchemeHTTP
+	if c.HTTPGet.Scheme == corev1.URISchemeHTTPS {
+		c.HTTPGet.Scheme = corev1.URISchemeHTTP
 	}
+	c.InitialDelaySeconds = probe.InitialDelaySeconds
+	c.TimeoutSeconds = probe.TimeoutSeconds
 	return c
 }
 
@@ -193,10 +195,10 @@ func rewriteAppHTTPProbe(annotations map[string]string, podSpec *corev1.PodSpec,
 		}
 		readyz, livez := status.FormatProberURL(c.Name)
 		if hg := convertAppProber(c.ReadinessProbe, readyz, statusPort); hg != nil {
-			*c.ReadinessProbe.HTTPGet = *hg
+			*c.ReadinessProbe = *hg
 		}
 		if hg := convertAppProber(c.LivenessProbe, livez, statusPort); hg != nil {
-			*c.LivenessProbe.HTTPGet = *hg
+			*c.LivenessProbe = *hg
 		}
 	}
 }
@@ -229,14 +231,14 @@ func createProbeRewritePatch(annotations map[string]string, podSpec *corev1.PodS
 		if after := convertAppProber(c.ReadinessProbe, readyz, statusPort); after != nil {
 			patch = append(patch, rfc6902PatchOperation{
 				Op:    "replace",
-				Path:  fmt.Sprintf("/spec/containers/%v/readinessProbe/httpGet", i),
+				Path:  fmt.Sprintf("/spec/containers/%v/readinessProbe", i),
 				Value: *after,
 			})
 		}
 		if after := convertAppProber(c.LivenessProbe, livez, statusPort); after != nil {
 			patch = append(patch, rfc6902PatchOperation{
 				Op:    "replace",
-				Path:  fmt.Sprintf("/spec/containers/%v/livenessProbe/httpGet", i),
+				Path:  fmt.Sprintf("/spec/containers/%v/livenessProbe", i),
 				Value: *after,
 			})
 		}

@@ -59,6 +59,8 @@ var (
 // It's a map from the prober URL path to the Kubernetes Prober config.
 // For example, "/app-health/hello-world/livez" entry contains livenss prober config for
 // container "hello-world".
+// TODO(here): more need to carry over more fields from readinessProbe where
+// the timeout is done as well.
 type KubeAppProbers map[string]*corev1.HTTPGetAction
 
 // Config for the status server.
