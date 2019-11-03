@@ -228,6 +228,9 @@ func createProbeRewritePatch(annotations map[string]string, podSpec *corev1.PodS
 			portMap[p.Name] = p.ContainerPort
 		}
 		readyz, livez := status.FormatProberURL(c.Name)
+		// TODO(here): does not make any sense... we just do replace for the httpGet
+		// action which should be fine, keeping original probe delay section untouched.
+		// Figure out whether it's reproducible of the missing initialDelay seconds.
 		if after := convertAppProber(c.ReadinessProbe, readyz, statusPort); after != nil {
 			patch = append(patch, rfc6902PatchOperation{
 				Op:    "replace",
