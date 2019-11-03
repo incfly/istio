@@ -660,6 +660,11 @@ func TestRewriteAppProbe(t *testing.T) {
 			rewriteAppHTTPProbe: true,
 			want:                "ready_live.yaml.injected",
 		},
+		{
+			in:                  "hello-probe-timeout.yaml",
+			rewriteAppHTTPProbe: true,
+			want:                "hello-probe-timeout.yaml.injected",
+		},
 		// TODO(incfly): add more test case covering different -statusPort=123, --statusPort=123
 		// No statusport, --statusPort 123.
 	}
