@@ -667,6 +667,49 @@ func TestWebhookInject(t *testing.T) {
 	}
 }
 
+func TestWebhookInject_AppProbes(t *testing.T) {
+	cases := []struct {
+		inputFile    string
+		wantFile     string
+		templateFile string
+	}{
+		{
+			inputFile: "hello-probes-timeout.yaml",
+			wantFile:  "hello-probes-timeout.patch",
+		},
+	}
+
+	for i, c := range cases {
+		input := filepath.Join("testdata/webhook/app_probe", c.inputFile)
+		want := filepath.Join("testdata/webhook/app_probe", c.wantFile)
+		templateFile := "sidecar-template.yaml"
+		if c.templateFile != "" {
+			templateFile = c.templateFile
+		}
+		t.Run(fmt.Sprintf("[%d] %s", i, c.inputFile), func(t *testing.T) {
+			wh, cleanup := createTestWebhookFromFile(filepath.Join("testdata/webhook/app_probe/", templateFile), t)
+			defer cleanup()
+			podYAML := util.ReadFile(input, t)
+			podJSON, err := yaml.YAMLToJSON(podYAML)
+			if err != nil {
+				t.Fatalf(err.Error())
+			}
+			got := wh.inject(&v1beta1.AdmissionReview{
+				Request: &v1beta1.AdmissionRequest{
+					Object: runtime.RawExtension{
+						Raw: podJSON,
+					},
+				},
+			})
+			var prettyPatch bytes.Buffer
+			if err := json.Indent(&prettyPatch, got.Patch, "", "  "); err != nil {
+				t.Fatalf(err.Error())
+			}
+			util.CompareContent(prettyPatch.Bytes(), want, t)
+		})
+	}
+}
+
 // TestHelmInject tests the webhook injector with the installation configmap.yaml. It runs through many of the
 // same tests as TestIntoResourceFile in order to verify that the webhook performs the same way as the manual injector.
 func TestHelmInject(t *testing.T) {
