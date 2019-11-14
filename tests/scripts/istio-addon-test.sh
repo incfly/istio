@@ -17,7 +17,8 @@
 set -euxo pipefail
 
 # Extract Istio add-on version.
-export TAG=$(grep -Pom1 'image:.*:\K\d{1,3}\.\d{1,3}.\d{1,3}' "$MANIFEST_FILE")
+export TAG
+TAG=$(grep -Pom1 'image:.*:\K\d{1,3}\.\d{1,3}.\d{1,3}' "$MANIFEST_FILE")
 
 if [ -z "$TAG" ]; then
   echo "Unable to parse Istio version tag" >&2
