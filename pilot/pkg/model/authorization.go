@@ -70,7 +70,7 @@ func GetAuthorizationPolicies(env *Environment) (*AuthorizationPolicies, error) 
 	policy := &AuthorizationPolicies{
 		NamespaceToV1alpha1Policies: map[string]*RolesAndBindings{},
 		NamespaceToV1beta1Policies:  map[string][]AuthorizationPolicyConfig{},
-		RootNamespace:               env.Mesh.GetRootNamespace(),
+		RootNamespace:               env.Mesh().GetRootNamespace(),
 	}
 
 	rbacConfig := env.IstioConfigStore.ClusterRbacConfig()
@@ -113,6 +113,11 @@ func (policy *AuthorizationPolicies) GetClusterRbacConfig() *rbacproto.RbacConfi
 // IsRBACEnabled returns true if RBAC is enabled for the service in the given namespace.
 func (policy *AuthorizationPolicies) IsRBACEnabled(service string, namespace string) bool {
 	if policy == nil || policy.RbacConfig == nil {
+		return false
+	}
+
+	// If service or namespace is empty just return false.
+	if len(service) == 0 || len(namespace) == 0 {
 		return false
 	}
 

@@ -26,7 +26,7 @@ import (
 	"istio.io/istio/galley/pkg/config/resource"
 )
 
-// K8sAnalyzer checks for misplayed and invalid Istio annotations in K8s resources
+// K8sAnalyzer checks for misplaced and invalid Istio annotations in K8s resources
 type K8sAnalyzer struct{}
 
 var (
@@ -36,14 +36,12 @@ var (
 // Metadata implements analyzer.Analyzer
 func (*K8sAnalyzer) Metadata() analysis.Metadata {
 	return analysis.Metadata{
-		Name: "annotations.K8sAnalyzer",
+		Name:        "annotations.K8sAnalyzer",
+		Description: "Checks for misplaced and invalid Istio annotations in Kubernetes resources",
 		Inputs: collection.Names{
-			metadata.K8SCoreV1Endpoints,
 			metadata.K8SCoreV1Namespaces,
 			metadata.K8SCoreV1Services,
 			metadata.K8SCoreV1Pods,
-			metadata.K8SExtensionsV1Beta1Ingresses,
-			metadata.K8SCoreV1Nodes,
 			metadata.K8SAppsV1Deployments,
 		},
 	}
@@ -51,28 +49,16 @@ func (*K8sAnalyzer) Metadata() analysis.Metadata {
 
 // Analyze implements analysis.Analyzer
 func (fa *K8sAnalyzer) Analyze(ctx analysis.Context) {
-	ctx.ForEach(metadata.K8SCoreV1Endpoints, func(r *resource.Entry) bool {
-		fa.allowAnnotations(r, ctx, "Endpoints", metadata.K8SCoreV1Endpoints)
-		return true
-	})
 	ctx.ForEach(metadata.K8SCoreV1Namespaces, func(r *resource.Entry) bool {
 		fa.allowAnnotations(r, ctx, "Namespace", metadata.K8SCoreV1Namespaces)
-		return true
-	})
-	ctx.ForEach(metadata.K8SCoreV1Nodes, func(r *resource.Entry) bool {
-		fa.allowAnnotations(r, ctx, "Node", metadata.K8SCoreV1Nodes)
-		return true
-	})
-	ctx.ForEach(metadata.K8SCoreV1Pods, func(r *resource.Entry) bool {
-		fa.allowAnnotations(r, ctx, "Pod", metadata.K8SCoreV1Pods)
 		return true
 	})
 	ctx.ForEach(metadata.K8SCoreV1Services, func(r *resource.Entry) bool {
 		fa.allowAnnotations(r, ctx, "Service", metadata.K8SCoreV1Services)
 		return true
 	})
-	ctx.ForEach(metadata.K8SExtensionsV1Beta1Ingresses, func(r *resource.Entry) bool {
-		fa.allowAnnotations(r, ctx, "Ingress", metadata.K8SExtensionsV1Beta1Ingresses)
+	ctx.ForEach(metadata.K8SCoreV1Pods, func(r *resource.Entry) bool {
+		fa.allowAnnotations(r, ctx, "Pod", metadata.K8SCoreV1Pods)
 		return true
 	})
 	ctx.ForEach(metadata.K8SAppsV1Deployments, func(r *resource.Entry) bool {

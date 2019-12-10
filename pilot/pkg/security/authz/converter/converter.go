@@ -34,14 +34,14 @@ import (
 	rbac_v1alpha1 "istio.io/api/rbac/v1alpha1"
 	rbac_v1beta1 "istio.io/api/security/v1beta1"
 	"istio.io/api/type/v1beta1"
-	"istio.io/istio/pilot/cmd"
+	"istio.io/pkg/log"
+
 	"istio.io/istio/pilot/pkg/config/kube/crd"
 	"istio.io/istio/pilot/pkg/model"
 	authz_model "istio.io/istio/pilot/pkg/security/authz/model"
 	"istio.io/istio/pilot/pkg/security/trustdomain"
 	"istio.io/istio/pkg/config/mesh"
 	"istio.io/istio/pkg/config/schemas"
-	"istio.io/pkg/log"
 )
 
 // WorkloadLabels is the workload labels, for example, app: productpage.
@@ -64,6 +64,10 @@ const (
 	sourceNamespace      = "source.namespace"
 	sourceIP             = "source.ip"
 	requestAuthPrincipal = "request.auth.principal"
+)
+
+const (
+	messageToBeRemoved = "===PLEASE REVIEW THE GENERATED POLICY AND REMOVE THIS LINE BEFORE APPLYING IT===\n"
 )
 
 const (
@@ -116,6 +120,7 @@ func New(k8sClient *kubernetes.Clientset, v1alpha1Policies *model.AuthorizationP
 		NamespaceToServiceToSelector: namespaceToServiceToSelector,
 		v1beta1Policies:              []model.Config{},
 	}
+	converter.ConvertedPolicies.WriteString(messageToBeRemoved)
 	return &converter, nil
 }
 
@@ -124,7 +129,7 @@ func getRootNamespace(k8sClient *kubernetes.Clientset, meshConfigFile, meshConfi
 	var meshConfig *v1alpha1.MeshConfig
 	var err error
 	if meshConfigFile != "" {
-		if meshConfig, err = cmd.ReadMeshConfig(meshConfigFile); err != nil {
+		if meshConfig, err = mesh.ReadMeshConfig(meshConfigFile); err != nil {
 			return "", fmt.Errorf("failed to read the provided ConfigMap %s: %s", meshConfigFile, err)
 		}
 	} else {
@@ -427,6 +432,10 @@ func convertAccessRuleToOperation(rule *authz_model.Permission) (*rbac_v1beta1.O
 	if rule == nil {
 		return nil, fmt.Errorf("invalid input: No rule found in ServiceRole")
 	}
+	if len(rule.Constraints) > 0 && len(rule.Constraints[0]) > 0 {
+		// nolint: golint
+		return nil, fmt.Errorf("ServiceRole with constraints is not supported")
+	}
 	operation := rbac_v1beta1.Operation{}
 	operation.Methods = rule.Methods
 	operation.Paths = rule.Paths
@@ -441,7 +450,8 @@ func convertBindingToSources(principals []authz_model.Principal) ([]*rbac_v1beta
 	for _, subject := range principals {
 		// TODO(pitlv2109): Handle group
 		if subject.Group != "" {
-			return nil, fmt.Errorf("serviceRoleBinding with group is not supported")
+			// nolint: golint
+			return nil, fmt.Errorf("ServiceRoleBinding with group is not supported")
 		}
 		from := rbac_v1beta1.Rule_From{
 			Source: &rbac_v1beta1.Source{},

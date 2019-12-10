@@ -23,11 +23,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	mesh "istio.io/api/mesh/v1alpha1"
+	meshconfig "istio.io/api/mesh/v1alpha1"
 	rbacproto "istio.io/api/rbac/v1alpha1"
 	authpb "istio.io/api/security/v1beta1"
 	selectorpb "istio.io/api/type/v1beta1"
+
 	"istio.io/istio/pkg/config/labels"
+	"istio.io/istio/pkg/config/mesh"
 	"istio.io/istio/pkg/config/schema"
 	"istio.io/istio/pkg/config/schemas"
 )
@@ -615,7 +617,9 @@ func TestAuthorizationPolicies_IsRBACEnabled(t *testing.T) {
 						Mode: rbacproto.RbacConfig_ON,
 					}),
 			},
-			want: true,
+			service:   "product.default.svc",
+			namespace: "default",
+			want:      true,
 		},
 		{
 			name: "enabled with permissive",
@@ -626,7 +630,9 @@ func TestAuthorizationPolicies_IsRBACEnabled(t *testing.T) {
 						EnforcementMode: rbacproto.EnforcementMode_PERMISSIVE,
 					}),
 			},
-			want: true,
+			service:   "product.default.svc",
+			namespace: "default",
+			want:      true,
 		},
 		{
 			name: "enabled by inclusion.service",
@@ -672,7 +678,9 @@ func TestAuthorizationPolicies_IsRBACEnabled(t *testing.T) {
 						Mode: rbacproto.RbacConfig_ON,
 					}),
 			},
-			want: true,
+			service:   "override.svc",
+			namespace: "ns",
+			want:      true,
 		},
 		{
 			name: "disabled by default",
@@ -685,6 +693,29 @@ func TestAuthorizationPolicies_IsRBACEnabled(t *testing.T) {
 						Mode: rbacproto.RbacConfig_OFF,
 					}),
 			},
+		},
+		{
+			name: "disabled-if-service-empty",
+			config: []Config{
+				newConfig("default", "",
+					&rbacproto.RbacConfig{
+						Mode: rbacproto.RbacConfig_ON,
+					}),
+			},
+			service:   "",
+			namespace: "default",
+			want:      false,
+		},
+		{
+			name: "disabled-if-ns-empty",
+			config: []Config{
+				newConfig("default", "",
+					&rbacproto.RbacConfig{
+						Mode: rbacproto.RbacConfig_ON,
+					}),
+			},
+			service: "product.default.svc",
+			want:    false,
 		},
 		{
 			name: "disabled by exclusion.service",
@@ -730,7 +761,7 @@ func createFakeAuthorizationPolicies(configs []Config, t *testing.T) *Authorizat
 	}
 	environment := &Environment{
 		IstioConfigStore: MakeIstioStore(store),
-		Mesh:             &mesh.MeshConfig{RootNamespace: "istio-config"},
+		Watcher:          mesh.NewFixedWatcher(&meshconfig.MeshConfig{RootNamespace: "istio-config"}),
 	}
 	authzPolicies, err := GetAuthorizationPolicies(environment)
 	if err != nil {

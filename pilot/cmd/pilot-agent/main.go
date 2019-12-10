@@ -62,7 +62,7 @@ const trustworthyJWTPath = "/var/run/secrets/tokens/istio-token"
 var (
 	role          = &model.Proxy{}
 	proxyIP       string
-	registry      serviceregistry.ServiceRegistry
+	registryID    serviceregistry.ProviderID
 	trustDomain   string
 	pilotIdentity string
 	mixerIdentity string
@@ -97,6 +97,7 @@ var (
 	disableInternalTelemetry bool
 	tlsCertsToWatch          []string
 	loggingOptions           = log.DefaultOptions()
+	outlierLogPath           string
 
 	wg sync.WaitGroup
 
@@ -187,9 +188,9 @@ var (
 			// operational parameters correctly.
 			proxyIPv6 := isIPv6Proxy(role.IPAddresses)
 			if len(role.ID) == 0 {
-				if registry == serviceregistry.KubernetesRegistry {
+				if registryID == serviceregistry.Kubernetes {
 					role.ID = podName + "." + podNamespace
-				} else if registry == serviceregistry.ConsulRegistry {
+				} else if registryID == serviceregistry.Consul {
 					role.ID = role.IPAddresses[0] + ".service.consul"
 				} else {
 					role.ID = role.IPAddresses[0]
@@ -241,7 +242,7 @@ var (
 			case meshconfig.AuthenticationPolicy_MUTUAL_TLS.String():
 				controlPlaneAuthEnabled = true
 				proxyConfig.ControlPlaneAuthPolicy = meshconfig.AuthenticationPolicy_MUTUAL_TLS
-				if registry == serviceregistry.KubernetesRegistry {
+				if registryID == serviceregistry.Kubernetes {
 					partDiscoveryAddress := strings.Split(discoveryAddress, ":")
 					discoveryHostname := partDiscoveryAddress[0]
 					parts := strings.Split(discoveryHostname, ".")
@@ -346,25 +347,25 @@ var (
 			// Legacy - so pilot-agent can be used with citadel node agent.
 			// Main will be replaced by istio-agent when we clean up - this code can stay here and be removed with the rest.
 			sdsUDSPath := sdsUdsPathVar.Get()
-			sdsEnabled, sdsTokenPath := detectSds(controlPlaneBootstrap, sdsUDSPath, trustworthyJWTPath)
+			nodeAgentSDSEnabled, sdsTokenPath := detectSds(controlPlaneBootstrap, sdsUDSPath, trustworthyJWTPath)
 
-			if !sdsEnabled && role.Type == model.SidecarProxy { // Not using citadel agent - this is either Pilot or Istiod.
+			if !nodeAgentSDSEnabled && role.Type == model.SidecarProxy { // Not using citadel agent - this is either Pilot or Istiod.
 
 				// Istiod and new SDS-only mode doesn't use sdsUdsPathVar - sdsEnabled will be false.
 				sa := istio_agent.NewSDSAgent(discoveryAddress, controlPlaneAuthEnabled)
 
-				if sa.JWTPath != "" && role.Type == model.SidecarProxy {
+				if sa.JWTPath != "" {
 					// If user injected a JWT token for SDS - use SDS.
-					sdsEnabled = true
+					nodeAgentSDSEnabled = true
 					sdsTokenPath = sa.JWTPath
 					sdsUDSPath = sa.SDSAddress
 
+					// Connection to Istiod secure port
 					if sa.RequireCerts {
 						controlPlaneAuthEnabled = true
 					}
 
 					// For normal Istio - start in process SDS.
-					// Ingress: WIP, permissions needed.
 
 					// citadel node-agent not found, but we have a K8S JWT available. Start an in-process SDS.
 					_, err := sa.Start(role.Type == model.SidecarProxy, podNamespaceVar.Get())
@@ -387,7 +388,7 @@ var (
 			// Since Envoy needs the file-mounted certs for mTLS, we wait for them to become available
 			// before starting it. Skip waiting cert if sds is enabled, otherwise it takes long time for
 			// pod to start.
-			if (controlPlaneAuthEnabled || rsTLSEnabled || autoMTLSEnabled.Get()) && !sdsEnabled {
+			if (controlPlaneAuthEnabled || rsTLSEnabled || autoMTLSEnabled.Get()) && !nodeAgentSDSEnabled {
 				log.Infof("Monitored certs: %#v", tlsCertsToWatch)
 				for _, cert := range tlsCertsToWatch {
 					waitForFile(cert, 2*time.Minute)
@@ -396,7 +397,7 @@ var (
 
 			// If control plane auth is not mTLS or global SDS flag is turned off, unset UDS path and token path
 			// for control plane SDS.
-			if !controlPlaneAuthEnabled || !sdsEnabled {
+			if !controlPlaneAuthEnabled || !nodeAgentSDSEnabled {
 				sdsUDSPath = ""
 				sdsTokenPath = ""
 			}
@@ -494,11 +495,12 @@ var (
 				SDSTokenPath:        sdsTokenPath,
 				ControlPlaneAuth:    controlPlaneAuthEnabled,
 				DisableReportCalls:  disableInternalTelemetry,
+				OutlierLogPath:      outlierLogPath,
 			})
 
 			agent := envoy.NewAgent(envoyProxy, features.TerminationDrainDuration())
 
-			if sdsEnabled && role.Type == model.SidecarProxy {
+			if nodeAgentSDSEnabled && role.Type == model.SidecarProxy {
 				tlsCertsToWatch = []string{}
 			}
 
@@ -541,10 +543,10 @@ func setSpiffeTrustDomain(podNamespace string, domain string) {
 	if controlPlaneAuthPolicy == meshconfig.AuthenticationPolicy_MUTUAL_TLS.String() {
 		pilotTrustDomain := trustDomain
 		if len(pilotTrustDomain) == 0 {
-			if registry == serviceregistry.KubernetesRegistry &&
+			if registryID == serviceregistry.Kubernetes &&
 				(domain == podNamespace+".svc.cluster.local" || domain == "") {
 				pilotTrustDomain = "cluster.local"
-			} else if registry == serviceregistry.ConsulRegistry &&
+			} else if registryID == serviceregistry.Consul &&
 				(domain == "service.consul" || domain == "") {
 				pilotTrustDomain = ""
 			} else {
@@ -571,9 +573,9 @@ func getSAN(ns string, defaultSA string, overrideIdentity string) []string {
 
 func getDNSDomain(podNamespace, domain string) string {
 	if len(domain) == 0 {
-		if registry == serviceregistry.KubernetesRegistry {
+		if registryID == serviceregistry.Kubernetes {
 			domain = podNamespace + ".svc.cluster.local"
-		} else if registry == serviceregistry.ConsulRegistry {
+		} else if registryID == serviceregistry.Consul {
 			domain = "service.consul"
 		} else {
 			domain = ""
@@ -660,10 +662,10 @@ func appendTLSCerts(rs *meshconfig.RemoteService) {
 }
 
 func init() {
-	proxyCmd.PersistentFlags().StringVar((*string)(&registry), "serviceregistry",
-		string(serviceregistry.KubernetesRegistry),
+	proxyCmd.PersistentFlags().StringVar((*string)(&registryID), "serviceregistry",
+		string(serviceregistry.Kubernetes),
 		fmt.Sprintf("Select the platform for service registry, options are {%s, %s, %s, %s}",
-			serviceregistry.KubernetesRegistry, serviceregistry.ConsulRegistry, serviceregistry.MCPRegistry, serviceregistry.MockRegistry))
+			serviceregistry.Kubernetes, serviceregistry.Consul, serviceregistry.MCP, serviceregistry.Mock))
 	proxyCmd.PersistentFlags().StringVar(&proxyIP, "ip", "",
 		"Proxy IP address. If not provided uses ${INSTANCE_IP} environment variable.")
 	proxyCmd.PersistentFlags().StringVar(&role.ID, "id", "",
@@ -740,6 +742,8 @@ func init() {
 		"Disable internal telemetry")
 	proxyCmd.PersistentFlags().BoolVar(&controlPlaneBootstrap, "controlPlaneBootstrap", true,
 		"Process bootstrap provided via templateFile to be used by control plane components.")
+	proxyCmd.PersistentFlags().StringVar(&outlierLogPath, "outlierLogPath", "",
+		"The log path for outlier detection")
 
 	// Attach the Istio logging options to the command.
 	loggingOptions.AttachCobraFlags(rootCmd)
