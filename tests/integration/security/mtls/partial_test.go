@@ -24,8 +24,8 @@ import (
 	"istio.io/istio/tests/integration/security/util/reachability"
 )
 
-// This test verifies when auto mTLS enabled and server workloads are partially migrated to Istio,
-// but clients can still reach out to all server endpoints.
+// This test verifies when auto mTLS enabled (by default) and server workloads are partially migrated to Istio,
+// clients can still reach out to all server endpoints.
 func TestAutoMTLS_Partial(t *testing.T) {
 	framework.NewTest(t).
 		Run(func(ctx framework.TestContext) {
@@ -33,6 +33,11 @@ func TestAutoMTLS_Partial(t *testing.T) {
 			rctx := reachability.CreateContext(ctx, g, p)
 			systemNM := namespace.ClaimSystemNamespaceOrFail(ctx, ctx)
 
+			// mTLS policy enabled on the test namespace.
+			// Service foo are sidecar injected partially.
+			// Client bar are able to reach out to all endpoints.
+			// Nuke client is only able to reach out to nuke server endpoints.
+			// mtls Policy disabled, everything reachable.
 			testCases := []reachability.TestCase{
 				{
 					ConfigFile:          "global-mtls-on-no-dr.yaml",
@@ -43,7 +48,6 @@ func TestAutoMTLS_Partial(t *testing.T) {
 						if opts.Target == rctx.Headless && opts.PortName == "tcp" {
 							return false
 						}
-
 						return true
 					},
 					ExpectSuccess: func(src echo.Instance, opts echo.CallOptions) bool {
@@ -53,7 +57,6 @@ func TestAutoMTLS_Partial(t *testing.T) {
 							// calls to naked should always succeed.
 							return true
 						}
-
 						// If source is naked, and destination is not, expect failure.
 						return !(src == rctx.Naked && opts.Target != rctx.Naked)
 					},
