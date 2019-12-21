@@ -1,0 +1,34 @@
+
+syntax = "proto3";
+
+package api;
+
+
+option go_package = "api";
+
+
+service MeshTroubleshootingService{
+  rpc GetConfigDump(GetConfigDumpRequest)
+    returns(stream GetConfigDumpResponse){
+  }
+}
+
+service ProxyTroubleshootingService {
+  rpc Troubleshoot(stream TroubleShootingResponse)
+      returns(stream TroubleShootingRequest) {}
+}
+
+message GetConfigDumpRequest{
+}
+message GetConfigDumpResponse{
+  string payload = 1;
+}
+
+message TroubleShootingResponse{
+  string request_id = 1;
+  string payload = 2;
+}
+
+message TroubleShootingRequest{
+  string request_id = 1;
+}
