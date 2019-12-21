@@ -3,9 +3,10 @@ package troubleshooting
 import (
 	"context"
 	"fmt"
-	"time"
-	// "io"
+	"math/rand"
 	"net"
+	"strconv"
+	"time"
 
 	"google.golang.org/grpc"
 	"istio.io/istio/pilot/pkg/troubleshooting/api"
@@ -22,7 +23,6 @@ type ProxyClient struct {
 
 // gRPC server, but the actual information client, runs on istiod.
 func NewProxyServer() (*ProxyServer, error) {
-	// p := api.GetConfigDumpResponse{}
 	return &ProxyServer{}, nil
 }
 
@@ -41,16 +41,20 @@ func (s *ProxyServer) Start() error {
 
 func (s *ProxyServer) Troubleshoot(stream api.ProxyTroubleshootingService_TroubleshootServer) error {
 	fmt.Println("incfly dbg, Troubleshoot server...")
+	i := 1
 	for {
 		in, err := stream.Recv()
 		if err != nil {
 			return err
 		}
 		fmt.Printf("request received %v, sending echo\n", in)
+		// TODO: put in actual mesh level api triggering, sleep is for simulation.
 		time.Sleep(3 * time.Second)
-		if err := stream.Send(&api.TroubleShootingRequest{
-			RequestId: "server-random",
-		}); err != nil {
+		err = stream.Send(&api.TroubleShootingRequest{
+			RequestId: "server-req-" + strconv.Itoa(i),
+		})
+		i += 1
+		if err != nil {
 			return err
 		}
 	}
@@ -74,12 +78,15 @@ func (c *ProxyClient) Start() error {
 		return err
 	}
 	// first send a bogus hello world from proxy agent.
-	stream.Send(&api.TroubleShootingResponse{
+	err = stream.Send(&api.TroubleShootingResponse{
 		RequestId: "-1",
 	})
+	// TODO: add several retries before giving up.
+	if err != nil {
+		return err
+	}
 
 	// Now starts to wait for instructions from the server.
-
 	for {
 		in, err := stream.Recv()
 		if err != nil {
@@ -87,10 +94,21 @@ func (c *ProxyClient) Start() error {
 			return err
 		}
 		log.Infof("received server info: %v", in.RequestId)
-		// for each debugging request sent from server, do something.
-		// future in separate goroutine.
-		stream.Send(&api.TroubleShootingResponse{
-			RequestId: "client-response-" + in.RequestId,
-		})
+		// for each debugging request sent from server, fullfil the rerequest in a separate goroutine.
+		go c.handleRequest(stream, in)err
 	}
+}
+
+func (c *ProxyClient) handleRequest(
+	stream api.ProxyTroubleshootingService_TroubleshootClient, req *api.TroubleShootingRequest) {
+	// Config Dump or Loglevel, depends.
+	time.Sleep(time.Second * time.Duration(rand.Intn(5)))
+	resp := &api.TroubleShootingResponse{
+		RequestId: req.RequestId,
+		Payload:   "abc",
+	}
+	if err := stream.Send(resp); err != nil {
+		log.Errorf("failed to send the response %v", err)
+	}
+	log.Infof("finish handling request: %v", req.RequestId)
 }
