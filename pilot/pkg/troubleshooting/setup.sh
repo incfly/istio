@@ -1,11 +1,17 @@
 #!/bin/bash
 
-protoc --go_out=plugins=grpc:. api/service.proto
+proto() {
+  protoc --go_out=plugins=grpc:. api/service.proto
+}
 
-func server() {
+server() {
   go run ./cmd/istiod
 }
 
-func client() {
+client() {
   go run ./cmd/agent
+}
+
+cli() {
+  go run ./cmd/cli
 }
