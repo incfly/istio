@@ -25,9 +25,15 @@ source setup.sh && cli
 
 In order...
 
-1. Handle TODO for long running request streaming.
 1. More than one proxy streaming, be able to stream response, linked replies.
-   1. use reserved word "all" for now.
+   1. add selector in proto
+   1. hardcoded syntax for now, "proxy1" prefix, "all" for the rest.
+   1. cli code change for the stream effect.
+1. actual respect the requestId. incrementing.
 1. maybe tracking map when connection is lost?
 1. HTTP libraries for sending request to config dump interface.
 1. Test.
+
+
+1. Handle TODO for long running request streaming.
+   1. Done. Already in separate go routine.
