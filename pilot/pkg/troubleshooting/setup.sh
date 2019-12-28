@@ -5,11 +5,11 @@ proto() {
 }
 
 server() {
-  go run ./cmd/istiod
+  go run ./cmd/istiod "$@"
 }
 
 client() {
-  go run ./cmd/agent
+  go run ./cmd/agent "$@"
 }
 
 cli() {

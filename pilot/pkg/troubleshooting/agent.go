@@ -2,7 +2,7 @@ package troubleshooting
 
 import (
 	"context"
-	// "fmt"
+	"fmt"
 	"math/rand"
 	// "net"
 	// "strconv"
@@ -14,32 +14,39 @@ import (
 )
 
 type Agent struct {
-	conn   *grpc.ClientConn
-	client api.ProxyTroubleshootingServiceClient
+	proxyID string
+	conn    *grpc.ClientConn
+	client  api.ProxyTroubleshootingServiceClient
+}
+
+type AgentConfig struct {
+	ID string
 }
 
 // gRPC client, but the actual information server, runs on istio agent/pilot agent.
-func NewAgent() (*Agent, error) {
+func NewAgent(c *AgentConfig) (*Agent, error) {
 	conn, err := grpc.Dial("localhost:8000", grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
+	log.Infof("proxy id debug %v", c.ID)
 	return &Agent{
-		conn:   conn,
-		client: api.NewProxyTroubleshootingServiceClient(conn),
+		conn:    conn,
+		client:  api.NewProxyTroubleshootingServiceClient(conn),
+		proxyID: c.ID,
 	}, nil
 }
 
 func (c *Agent) Start() error {
-	// ctx := context.WithValue(context.Background(), "proxyID", "proxy1")
 	stream, err := c.client.Troubleshoot(context.Background())
 	if err != nil {
 		return err
 	}
 	// first send a bogus hello world from proxy agent.
 	err = stream.Send(&api.TroubleShootingResponse{
-		RequestId: "proxy1",
+		RequestId: c.proxyID,
 	})
+
 	// TODO: add several retries before giving up.
 	if err != nil {
 		log.Errorf("failed to send request troubleshot %v", err)
@@ -62,10 +69,10 @@ func (c *Agent) Start() error {
 func (c *Agent) handleRequest(
 	stream api.ProxyTroubleshootingService_TroubleshootClient, req *api.TroubleShootingRequest) {
 	// Config Dump or Loglevel, depends.
-	time.Sleep(time.Second * time.Duration(rand.Intn(5)))
+	time.Sleep(time.Second * time.Duration(rand.Intn(3)))
 	resp := &api.TroubleShootingResponse{
 		RequestId: req.RequestId,
-		Payload:   "abc",
+		Payload:   fmt.Sprintf("response-%v-%v", c.proxyID, rand.Int31()),
 	}
 	if err := stream.Send(resp); err != nil {
 		log.Errorf("failed to send the response %v", err)

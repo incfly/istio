@@ -22,8 +22,6 @@ type Server struct {
 	proxyMap map[string]chan *api.TroubleShootingResponse
 	// current 1 to 1 two maps, later on make it more sophisicated, not 1 to 1 mapping, fan out, fan in, etc.
 	proxyActivator map[string]chan struct{}
-	// maybe build some other efficient data structure index for common usage later on.
-	conn *grpc.ClientConn
 }
 
 // type ProxyInfo struct{}
