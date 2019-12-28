@@ -17,10 +17,12 @@ type Agent struct {
 	proxyID string
 	conn    *grpc.ClientConn
 	client  api.ProxyTroubleshootingServiceClient
+	delay   time.Duration
 }
 
 type AgentConfig struct {
-	ID string
+	ID    string
+	Delay time.Duration
 }
 
 // gRPC client, but the actual information server, runs on istio agent/pilot agent.
@@ -34,6 +36,7 @@ func NewAgent(c *AgentConfig) (*Agent, error) {
 		conn:    conn,
 		client:  api.NewProxyTroubleshootingServiceClient(conn),
 		proxyID: c.ID,
+		delay:   c.Delay,
 	}, nil
 }
 
@@ -66,10 +69,11 @@ func (c *Agent) Start() error {
 	}
 }
 
+// Config Dump or Loglevel, depends.
 func (c *Agent) handleRequest(
 	stream api.ProxyTroubleshootingService_TroubleshootClient, req *api.TroubleShootingRequest) {
-	// Config Dump or Loglevel, depends.
-	time.Sleep(time.Second * time.Duration(rand.Intn(3)))
+	log.Infof("delay duration %v before responded", c.delay)
+	time.Sleep(c.delay)
 	resp := &api.TroubleShootingResponse{
 		RequestId: req.RequestId,
 		Payload:   fmt.Sprintf("response-%v-%v", c.proxyID, rand.Int31()),

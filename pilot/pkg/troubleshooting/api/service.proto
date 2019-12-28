@@ -18,8 +18,15 @@ service ProxyTroubleshootingService {
       returns(stream TroubleShootingRequest) {}
 }
 
-message GetConfigDumpRequest{
+// Fake one.
+message Selector {
+  string id_prefix = 1;
 }
+
+message GetConfigDumpRequest{
+  Selector selector = 1;
+}
+
 message GetConfigDumpResponse{
   string payload = 1;
 }

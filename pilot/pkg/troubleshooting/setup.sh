@@ -8,10 +8,10 @@ server() {
   go run ./cmd/istiod "$@"
 }
 
-client() {
+agent() {
   go run ./cmd/agent "$@"
 }
 
 cli() {
-  go run ./cmd/cli
+  go run ./cmd/cli "$@"
 }

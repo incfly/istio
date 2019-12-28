@@ -21,6 +21,7 @@ type Server struct {
 	// current set, string is the pod id.
 	proxyMap map[string]chan *api.TroubleShootingResponse
 	// current 1 to 1 two maps, later on make it more sophisicated, not 1 to 1 mapping, fan out, fan in, etc.
+	// TODO: make it channel of channel. so no need for two map. or this becomes proxyInfo struct's one field.
 	proxyActivator map[string]chan struct{}
 }
 
@@ -70,9 +71,22 @@ func (s *Server) updateProxyIDCache(proxyID string) {
 	s.proxyActivator[proxyID] = make(chan struct{})
 }
 
-// facing istioctl
-func (s *Server) GetConfigDump(
-	req *api.GetConfigDumpRequest, stream api.MeshTroubleshootingService_GetConfigDumpServer) error {
+// TODO: here. activate particular proxy.
+// func activate(proxyID string, resp chan *api.TroubleShootingResponse) error {
+// 	// get some response from the proxy.
+// 	resp <- &api.TroubleShootingResponse{}
+// 	return nil
+// }
+
+// Facing istioctl.
+func (s *Server) GetConfigDump(req *api.GetConfigDumpRequest, stream api.MeshTroubleshootingService_GetConfigDumpServer) error {
+	// TODO: here.
+	// c := make(chan *api.TroubleShootingResponse)
+	// for id := range []string{"ab", "cd"} {
+	// 	activate(id, c)
+	// }
+	// c is for this RPC.
+
 	log.Infof("incfly dbg, getconfig req, %v", s.requestID)
 	// what if two istoctl dbg with same selector.
 	// c, _ := s.allocateFunnel("random-selector-info+request-uuid")

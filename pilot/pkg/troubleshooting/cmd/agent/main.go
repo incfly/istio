@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	proxyID string
-	rootCmd cobra.Command = cobra.Command{
+	proxyID      string
+	sleepSeconds int
+	rootCmd      cobra.Command = cobra.Command{
 		Use: "agent, to be replaced by pilot agent",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println("agent started")
@@ -26,6 +27,10 @@ var (
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&proxyID, "id", "i", "proxy1", "the id of the proxy")
+
+	// TODO remove before merge. Maybe needed for test injection though.
+	rootCmd.PersistentFlags().IntVarP(&sleepSeconds, "sleep", "s", 3,
+		"seconds to sleep before serving, simulate results  for streaming.")
 }
 
 func main() {
