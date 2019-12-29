@@ -3,40 +3,46 @@
 
 ## Setup
 
-First window
+server
 
 ```shell
 source setup.sh && server
 ```
 
-Second window
+proxy agent
 
 ```shell
-source setup.sh && agent
+# first proxy window
+source ./setup.sh&& agent -i 'proxy1'
+# second one
+source ./setup.sh&& agent -i 'proxy2'
 ```
 
-Third window
+CLI window
 
 ```shell
-source setup.sh && cli
+# diff order of executions.
+source ./setup.sh && cli  -s  ''
+source ./setup.sh && cli  -s  'proxy2'
+source ./setup.sh && cli  -s  'random'
 ```
 
 ## TODO
 
 In order...
 
-1. More than one proxy streaming, be able to stream response, linked replies.
-   1. add selector in proto
-   1. hardcoded syntax for now, "proxy1" prefix, "all" for the rest.
-   1. cli code change for the stream effect.
 1. actual respect the requestId. incrementing.
 1. maybe tracking map when connection is lost?
 1. HTTP libraries for sending request to config dump interface.
 
+### DONE
 
 1. Handle TODO for long running request streaming.
    1. Done. Already in separate go routine.
-
+1. More than one proxy streaming, be able to stream response, linked replies.
+   1. add selector in proto.
+   1. hardcoded syntax for now, "proxy1" prefix, "all" for the rest.
+   1. cli code change for the stream effect.
 
 1. Test Cases
   1. single 1,1,1 working.

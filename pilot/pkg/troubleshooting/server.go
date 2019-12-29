@@ -6,6 +6,7 @@ import (
 	// "math/rand"
 	"net"
 	"strings"
+	// "sync"
 	// "strconv"
 	// "time"
 
@@ -47,65 +48,59 @@ func (s *Server) Start() error {
 	return grpcServer.Serve(lis)
 }
 
-// chan is for fan in, multi stream fan-ined to same channel.
-// pointer to avoid copy.
-// func (s *Server) allocateFunnel(selector string) (chan *api.TroubleShootingResponse, error) {
-// 	c := make(chan *api.TroubleShootingResponse)
-// 	// TODO: there's some logic to analyze which istio agents to send request.
-// 	// efficiently iterate all the proxy to. For now we just use one to one simple match.
-// 	// go func() {
-// 	// 	for _, p := range []string{"proxy1", "proxy2"} {
-// 	// 		if p == "proxy1" {
-// 	// 			// trigger that proxy's channel activator channel.
-// 	// 			// somehow let the proxy send to this debugging session's channel, i.e.
-// 	// 			// activator is channel  of channel. read out, and use it!
-// 	// 		}
-// 	// 	}
-// 	// }()
-// 	return c, nil
-// }
-
 // put the proxy id into a local cache.
 func (s *Server) updateProxyIDCache(proxyID string) {
 	s.proxyMap[proxyID] = make(chan *api.TroubleShootingResponse)
 	s.proxyActivator[proxyID] = make(chan struct{})
 }
 
-// TODO: here. activate particular proxy.
-// func activate(proxyID string, resp chan *api.TroubleShootingResponse) error {
-// 	// get some response from the proxy.
-// 	resp <- &api.TroubleShootingResponse{}
-// 	return nil
-// }
+func (s *Server) matchProxy(selector *api.Selector) []string {
+	if selector == nil {
+		return []string{"proxy1"}
+	}
+	out := []string{}
+	for k := range s.proxyMap {
+		if strings.HasPrefix(k, selector.GetIdPrefix()) {
+			out = append(out, k)
+		}
+	}
+	return out
+}
 
 // Facing istioctl.
 func (s *Server) GetConfigDump(req *api.GetConfigDumpRequest, stream api.MeshTroubleshootingService_GetConfigDumpServer) error {
-	// TODO: here.
-	// c := make(chan *api.TroubleShootingResponse)
-	// for id := range []string{"ab", "cd"} {
-	// 	activate(id, c)
-	// }
-	// c is for this RPC.
-
-	log.Infof("incfly dbg, getconfig req, %v", s.requestID)
-	// what if two istoctl dbg with same selector.
-	// c, _ := s.allocateFunnel("random-selector-info+request-uuid")
-	// TODO: hardcode proxy id for now.
-	c, ok := s.proxyMap["proxy1"]
-	if !ok {
-		log.Errorf("failed to find the proxy with id proxy1, returning...")
-		return fmt.Errorf("failed to find the proxy with id proxy1, returning...")
-	}
-	go func() {
-		act, ok := s.proxyActivator["proxy1"]
+	// channel for this particular rpc invocation.
+	c := make(chan *api.TroubleShootingResponse)
+	// var wg sync.WaitGroup
+	log.Infof("incfly dbg, getconfig req, %v", *req)
+	ps := s.matchProxy(req.GetSelector())
+	log.Infof("incfly dbg selected proxies %v", ps)
+	for _, p := range ps {
+		pdata, ok := s.proxyMap[p]
 		if !ok {
-			log.Errorf("failed to find channel for activator")
-			return
+			log.Errorf("failed to find the proxy with id proxy1, returning...")
+			return fmt.Errorf("failed to find the proxy with id proxy1, returning...")
 		}
-		act <- struct{}{}
-		log.Infof("sending channel information done")
-	}()
-	for {
+		// wg.Add(1)
+		go func(proxyID string) {
+			act, ok := s.proxyActivator[proxyID]
+			if !ok {
+				log.Errorf("failed to find channel for activator")
+				return
+			}
+			log.Infof("trying to activate proxy %v", proxyID)
+			act <- struct{}{}
+			log.Infof("activated proxy id %v", proxyID)
+			// TODO: assuming one response limitation for now.
+			data := <-pdata
+			log.Infof("received data from proxy id %v, now sending to the aggregators", proxyID)
+			c <- data
+		}(p)
+	}
+
+	// TODO: hack since we know the number of resp in advance. use wait group in another go routine
+	// to close channel next time.
+	for i := 0; i < len(ps); i++ {
 		cfg, ok := <-c
 		if !ok {
 			log.Errorf("return none ok from channel")
@@ -117,6 +112,7 @@ func (s *Server) GetConfigDump(req *api.GetConfigDumpRequest, stream api.MeshTro
 			return fmt.Errorf("failed to send, maybe stream closed ? %v", err)
 		}
 	}
+	log.Infof("finishing waiting all pieces are done")
 	return nil
 }
 
@@ -129,8 +125,9 @@ func (s *Server) Troubleshoot(
 	if err != nil {
 		return err
 	}
+	// TODO: this is a hack, proper using context value for proxy id, rather from actual payload.
 	proxyID := in.GetRequestId()
-	// TODO: this is a hack, proper using context value for proxy id.
+	// sanity check of the proxy id.
 	if !strings.HasPrefix(proxyID, "proxy") {
 		return fmt.Errorf("first req agent must pass the proxy id, please")
 	}
@@ -138,18 +135,21 @@ func (s *Server) Troubleshoot(
 	s.updateProxyIDCache(proxyID)
 	log.Infof("request received %v, proxy ID %v, doing nothing util waiting for activator...\n", in, proxyID)
 	go func() {
-		log.Infof("waiting for activator...")
-		// this is single stream should be okay to use id bound by outside scope, to be confirmed though.
-		a, ok := s.proxyActivator[proxyID]
-		if !ok {
-			log.Fatalf("horrible things happened, not find activator")
-		}
-		<-a
-		log.Infof("received channel, starting to plumbing info for this proxy")
-		err := stream.Send(&api.TroubleShootingRequest{})
-		if err != nil {
-			log.Errorf("stream to relay request failed %v", err)
-			return
+		for {
+			log.Infof("waiting for activator forever...")
+			// this is single stream should be okay to use id bound by outside scope, to be confirmed though.
+			a, ok := s.proxyActivator[proxyID]
+			if !ok {
+				log.Fatalf("horrible things happened, not find activator")
+			}
+			// waiting for activator instuctions.
+			<-a
+			log.Infof("received channel, starting to plumbing info for this proxy")
+			err := stream.Send(&api.TroubleShootingRequest{})
+			if err != nil {
+				log.Errorf("stream to relay request failed %v", err)
+				return
+			}
 		}
 	}()
 
@@ -159,11 +159,9 @@ func (s *Server) Troubleshoot(
 		if err != nil {
 			return err
 		}
-		// TODO: this is a hack, proper using context value for proxy id.
-		// actual payload
 		c, ok := s.proxyMap[proxyID]
 		if !ok {
-			log.Errorf("failed to identify cache, oops...closing")
+			log.Errorf("failed to identify cache, oops, closing...")
 			return fmt.Errorf("oops")
 		}
 		log.Infof("sending response to the server")
