@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	// "net"
-	// "strconv"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"istio.io/istio/pilot/pkg/troubleshooting/api"
 	"istio.io/pkg/log"
 )
@@ -41,7 +40,9 @@ func NewAgent(c *AgentConfig) (*Agent, error) {
 }
 
 func (c *Agent) Start() error {
-	stream, err := c.client.Troubleshoot(context.Background())
+	md := metadata.Pairs("proxyID", c.proxyID)
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	stream, err := c.client.Troubleshoot(ctx)
 	if err != nil {
 		return err
 	}

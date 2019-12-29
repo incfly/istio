@@ -32,6 +32,15 @@ source ./setup.sh && cli  -s  'random'
 In order...
 
 1. actual respect the requestId. incrementing.
+
+why need the request id? because agent sharing the same stream with different istoctl session.
+  1. cli slow req1, 5 secs, hold.
+  1. cli req2, 5 secs, might get the req1's response?
+
+Verify
+  1. impl some basic non-trivial msg handling in the agent svc, based on req payload.
+
+
 1. maybe tracking map when connection is lost?
 1. HTTP libraries for sending request to config dump interface.
 

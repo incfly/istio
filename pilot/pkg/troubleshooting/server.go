@@ -10,8 +10,8 @@ import (
 	// "strconv"
 	// "time"
 
-	// "google.golang.org/grpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"istio.io/istio/pilot/pkg/troubleshooting/api"
 	"istio.io/pkg/log"
 )
@@ -116,24 +116,31 @@ func (s *Server) GetConfigDump(req *api.GetConfigDumpRequest, stream api.MeshTro
 	return nil
 }
 
-// Facing agent.
+// Troubleshoot is agent facing.
 func (s *Server) Troubleshoot(
 	stream api.ProxyTroubleshootingService_TroubleshootServer) error {
 	log.Info("troubleshooting stream starts...")
+	md, ok := metadata.FromIncomingContext(stream.Context())
+	if !ok {
+		log.Errorf("not find proxy id from metadata, fail...")
+		return fmt.Errorf("failed with no metadata for proxy id")
+	}
+	proxyID := md.Get("proxyID")[0]
+	log.Infof("getting context metadata %v", proxyID)
 
+	// sanity check of the proxy id.
+	if !strings.HasPrefix(proxyID, "proxy") {
+		log.Errorf("first req agent must pass the proxy id, please, %v", proxyID)
+		return fmt.Errorf("first req agent must pass the proxy id, please, %v", proxyID)
+	}
+	// consuming out the first request.
 	in, err := stream.Recv()
 	if err != nil {
 		return err
 	}
-	// TODO: this is a hack, proper using context value for proxy id, rather from actual payload.
-	proxyID := in.GetRequestId()
-	// sanity check of the proxy id.
-	if !strings.HasPrefix(proxyID, "proxy") {
-		return fmt.Errorf("first req agent must pass the proxy id, please")
-	}
-
 	s.updateProxyIDCache(proxyID)
-	log.Infof("request received %v, proxy ID %v, doing nothing util waiting for activator...\n", in, proxyID)
+	log.Infof("request received %v, proxy ID %v, doing nothing util waiting for activator...\n",
+		in, proxyID)
 	go func() {
 		for {
 			log.Infof("waiting for activator forever...")
@@ -167,4 +174,8 @@ func (s *Server) Troubleshoot(
 		log.Infof("sending response to the server")
 		c <- in
 	}
+}
+
+// TODO: refactor into this from troubleshoot.
+func (s *Server) proxyLoop(proxyID string) {
 }
