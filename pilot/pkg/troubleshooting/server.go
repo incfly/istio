@@ -47,7 +47,7 @@ func NewServer() (*Server, error) {
 	}, nil
 }
 
-// TODO: stop channel.
+// TODO: stop channel adding.
 func (s *Server) Start() error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 8000))
 	if err != nil {
@@ -59,7 +59,6 @@ func (s *Server) Start() error {
 	return grpcServer.Serve(lis)
 }
 
-// put the proxy id into a local cache.
 func (s *Server) updateProxyIDCache(proxyID string) {
 	s.proxyMap[proxyID] = &proxyInfo{
 		id:        proxyID,

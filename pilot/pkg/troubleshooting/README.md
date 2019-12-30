@@ -32,35 +32,32 @@ source ./setup.sh && cli  -s  'random'
 multiple cli debugging request, request id is respected correctly.
 
 ```shell
-source setup.sh && server
-source ./setup.sh&& agent -i 'proxy1'
-
-# run two multiple times.
-for i in `seq 1 100`
-do
-  source ./setup.sh && cli  -s  ''
-  source ./setup.sh && cli  -s  ''
-done
+source ./setup.sh && server | tee server.log
+source ./setup.sh&& agent -i 'proxy1' | tee client.log
+source ./setup.sh && multiclient
 ```
 
 ## TODO
 
-In order...
+In right order.
+
+1. GC requestMap, proxyInfo map.
+
+Verify
+  1. impl some basic non-trivial msg handling in the agent svc, based on req payload.
+
+1. maybe tracking map when connection is lost?
+1. HTTP libraries for sending request to config dump interface.
+
+1. request log scope formatting polishing, requets id, proxy id, as base context.
+
+### DONE
 
 1. actual respect the requestId. incrementing.
 
 why need the request id? because agent sharing the same stream with different istoctl session.
   1. cli slow req1, 5 secs, hold.
-  1. cli req2, 5 secs, might get the req1's response?
-
-Verify
-  1. impl some basic non-trivial msg handling in the agent svc, based on req payload.
-
-
-1. maybe tracking map when connection is lost?
-1. HTTP libraries for sending request to config dump interface.
-
-### DONE
+  1. cli req2, 5 secs, might get the req1 s response?
 
 1. Handle TODO for long running request streaming.
    1. Done. Already in separate go routine.
