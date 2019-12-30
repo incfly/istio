@@ -92,6 +92,10 @@ func (s *Server) GetConfigDump(req *api.GetConfigDumpRequest, stream api.MeshTro
 			act <- struct{}{}
 			log.Infof("activated proxy id %v", proxyID)
 			// TODO: assuming one response limitation for now.
+			// TODO: here is wrong, using the same channel for one proxy accross different
+			// dbg session. cli-req1, cli-req2 both read from the same channel.
+			// can be avoided if we use diff channel in the first place.
+			// still write test case bash first.
 			data := <-pdata
 			log.Infof("received data from proxy id %v, now sending to the aggregators", proxyID)
 			c <- data
@@ -119,7 +123,9 @@ func (s *Server) GetConfigDump(req *api.GetConfigDumpRequest, stream api.MeshTro
 // Troubleshoot is agent facing.
 func (s *Server) Troubleshoot(
 	stream api.ProxyTroubleshootingService_TroubleshootServer) error {
-	log.Info("troubleshooting stream starts...")
+	// rid := fmt.Sprintf("cli-req-%v", s.requestID)
+	// s.requestID++
+	log.Infof("troubleshooting stream starts")
 	md, ok := metadata.FromIncomingContext(stream.Context())
 	if !ok {
 		log.Errorf("not find proxy id from metadata, fail...")
@@ -144,15 +150,20 @@ func (s *Server) Troubleshoot(
 	go func() {
 		for {
 			log.Infof("waiting for activator forever...")
-			// this is single stream should be okay to use id bound by outside scope, to be confirmed though.
+			// this is, cli req id assigned %v", rid) single stream should be okay to use id bound by outside scope, to be confirmed though.
 			a, ok := s.proxyActivator[proxyID]
 			if !ok {
 				log.Fatalf("horrible things happened, not find activator")
 			}
 			// waiting for activator instuctions.
 			<-a
-			log.Infof("received channel, starting to plumbing info for this proxy")
-			err := stream.Send(&api.TroubleShootingRequest{})
+			rid := fmt.Sprintf("cli-req-%v", s.requestID)
+			s.requestID++
+			log.Infof("received channel, starting to plumbing info for this proxy, request id %v",
+				rid)
+			err := stream.Send(&api.TroubleShootingRequest{
+				RequestId: rid,
+			})
 			if err != nil {
 				log.Errorf("stream to relay request failed %v", err)
 				return

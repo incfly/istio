@@ -65,7 +65,7 @@ func (c *Agent) Start() error {
 			return err
 		}
 		log.Infof("received server info: %v", in.RequestId)
-		// for each debugging request sent from server, fullfil the rerequest in a separate goroutine.
+		// for each debugging request sent from server, fullfil the request in a separate goroutine.
 		go c.handleRequest(stream, in)
 	}
 }
@@ -73,11 +73,12 @@ func (c *Agent) Start() error {
 // Config Dump or Loglevel, depends.
 func (c *Agent) handleRequest(
 	stream api.ProxyTroubleshootingService_TroubleshootClient, req *api.TroubleShootingRequest) {
-	log.Infof("delay duration %v before responded", c.delay)
-	time.Sleep(c.delay)
+	delay := time.Duration(rand.Intn(5)) * time.Second
+	log.Infof("delay duration %v before responded", delay)
+	time.Sleep(delay)
 	resp := &api.TroubleShootingResponse{
 		RequestId: req.RequestId,
-		Payload:   fmt.Sprintf("response-%v-%v", c.proxyID, rand.Int31()),
+		Payload:   fmt.Sprintf("response-%v-%v", c.proxyID, req.GetRequestId()),
 	}
 	if err := stream.Send(resp); err != nil {
 		log.Errorf("failed to send the response %v", err)

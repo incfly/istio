@@ -27,6 +27,22 @@ source ./setup.sh && cli  -s  'proxy2'
 source ./setup.sh && cli  -s  'random'
 ```
 
+### Multi cli req setup
+
+multiple cli debugging request, request id is respected correctly.
+
+```shell
+source setup.sh && server
+source ./setup.sh&& agent -i 'proxy1'
+
+# run two multiple times.
+for i in `seq 1 100`
+do
+  source ./setup.sh && cli  -s  ''
+  source ./setup.sh && cli  -s  ''
+done
+```
+
 ## TODO
 
 In order...
