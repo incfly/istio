@@ -26,9 +26,6 @@ type Server struct {
 	proxyMap map[string]*proxyInfo
 	// map from requestID to request related info.
 	requestMap map[string]*requestInfo
-	// current 1 to 1 two maps, later on make it more sophisicated, not 1 to 1 mapping, fan out, fan in, etc.
-	// TODO: make it channel of channel. so no need for two map. or this becomes proxyInfo struct's one field.
-	proxyActivator map[string]chan struct{}
 }
 
 type proxyInfo struct {
@@ -44,10 +41,9 @@ type requestInfo struct {
 
 func NewServer() (*Server, error) {
 	return &Server{
-		requestID:      1,
-		proxyMap:       make(map[string]*proxyInfo),
-		requestMap:     make(map[string]*requestInfo),
-		proxyActivator: make(map[string]chan struct{}),
+		requestID:  1,
+		proxyMap:   make(map[string]*proxyInfo),
+		requestMap: make(map[string]*requestInfo),
 	}, nil
 }
 
@@ -68,9 +64,7 @@ func (s *Server) updateProxyIDCache(proxyID string) {
 	s.proxyMap[proxyID] = &proxyInfo{
 		id:        proxyID,
 		activator: make(chan *api.TroubleShootingRequest),
-		// requestChan: make(chan *api.TroubleShootingResponse),
 	}
-	// s.proxyActivator[proxyID] = make(chan struct{})
 }
 
 func (s *Server) matchProxy(selector *api.Selector) []string {
@@ -131,12 +125,6 @@ func (s *Server) GetConfigDump(req *api.GetConfigDumpRequest, stream api.MeshTro
 				RequestId: reqID,
 			}
 			log.Infof("activated proxy id %v", pi.id)
-			// TODO: here is wrong, using the same channel for one proxy accross different
-			// dbg session. cli-req1, cli-req2 both read from the same channel.
-			// can be avoided if we use diff channel in the first place.
-			// still write test case bash first.
-			// data := <-pdata
-			log.Infof("received data from proxy id %v, now sending to the aggregators", pi.id)
 		}(pi)
 	}
 
