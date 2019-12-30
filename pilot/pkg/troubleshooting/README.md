@@ -75,3 +75,8 @@ Verify
   1. same request concurrently, should be able to served concurrently. (not currently, assuming...?)
   1. missing proxy id, not find.
   1. multiple find.
+
+
+## QA
+
+Does gRPC context auto populate metadata for the tracing? Or code required?

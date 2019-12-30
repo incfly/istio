@@ -16,22 +16,37 @@ import (
 	"istio.io/pkg/log"
 )
 
+type requestChan chan *api.TroubleShootingResponse
+
 type Server struct {
 	// last used requestID watermark.
 	requestID int
 	// current set, string is the pod id.
-	proxyMap map[string]chan *api.TroubleShootingResponse
+	// proxyMap map[string]chan *api.TroubleShootingResponse
+	proxyMap map[string]*proxyInfo
+	// map from requestID to request related info.
+	requestMap map[string]*requestInfo
 	// current 1 to 1 two maps, later on make it more sophisicated, not 1 to 1 mapping, fan out, fan in, etc.
 	// TODO: make it channel of channel. so no need for two map. or this becomes proxyInfo struct's one field.
 	proxyActivator map[string]chan struct{}
 }
 
-// type ProxyInfo struct{}
+type proxyInfo struct {
+	id string
+	// reading this channel to learn what request should be relayed.
+	activator chan *api.TroubleShootingRequest
+}
+
+type requestInfo struct {
+	id   string
+	sink requestChan
+}
 
 func NewServer() (*Server, error) {
 	return &Server{
 		requestID:      1,
-		proxyMap:       make(map[string]chan *api.TroubleShootingResponse),
+		proxyMap:       make(map[string]*proxyInfo),
+		requestMap:     make(map[string]*requestInfo),
 		proxyActivator: make(map[string]chan struct{}),
 	}, nil
 }
@@ -50,8 +65,12 @@ func (s *Server) Start() error {
 
 // put the proxy id into a local cache.
 func (s *Server) updateProxyIDCache(proxyID string) {
-	s.proxyMap[proxyID] = make(chan *api.TroubleShootingResponse)
-	s.proxyActivator[proxyID] = make(chan struct{})
+	s.proxyMap[proxyID] = &proxyInfo{
+		id:        proxyID,
+		activator: make(chan *api.TroubleShootingRequest),
+		// requestChan: make(chan *api.TroubleShootingResponse),
+	}
+	// s.proxyActivator[proxyID] = make(chan struct{})
 }
 
 func (s *Server) matchProxy(selector *api.Selector) []string {
@@ -67,39 +86,58 @@ func (s *Server) matchProxy(selector *api.Selector) []string {
 	return out
 }
 
+func (s *Server) updateRequestInfoMap(input string) (string, error) {
+	out := input
+	if input != "" {
+		_, ok := s.requestMap[input]
+		if ok {
+			return "", fmt.Errorf("prespecified request id %v already exists", input)
+		}
+	} else {
+		out = fmt.Sprintf("cli-req-%v", s.requestID)
+		s.requestID++
+	}
+	s.requestMap[out] = &requestInfo{
+		id:   out,
+		sink: make(chan *api.TroubleShootingResponse),
+	}
+	return out, nil
+}
+
 // Facing istioctl.
 func (s *Server) GetConfigDump(req *api.GetConfigDumpRequest, stream api.MeshTroubleshootingService_GetConfigDumpServer) error {
-	// channel for this particular rpc invocation.
-	c := make(chan *api.TroubleShootingResponse)
-	// var wg sync.WaitGroup
-	log.Infof("incfly dbg, getconfig req, %v", *req)
+	reqID, err := s.updateRequestInfoMap(req.GetRequestId())
+	if err != nil {
+		return fmt.Errorf("failed in request map update %v", err)
+	}
+	c := s.requestMap[reqID].sink
+	log.Infof("GetConfigDump request: %v, assigned req id %v, channel addr %v", *req, reqID, c)
 	ps := s.matchProxy(req.GetSelector())
-	log.Infof("incfly dbg selected proxies %v", ps)
+	log.Infof("Selected proxies %v", ps)
 	for _, p := range ps {
-		pdata, ok := s.proxyMap[p]
+		pi, ok := s.proxyMap[p]
 		if !ok {
 			log.Errorf("failed to find the proxy with id proxy1, returning...")
 			return fmt.Errorf("failed to find the proxy with id proxy1, returning...")
 		}
-		// wg.Add(1)
-		go func(proxyID string) {
-			act, ok := s.proxyActivator[proxyID]
+		go func(proxy *proxyInfo) {
+			pi, ok := s.proxyMap[pi.id]
 			if !ok {
 				log.Errorf("failed to find channel for activator")
 				return
 			}
-			log.Infof("trying to activate proxy %v", proxyID)
-			act <- struct{}{}
-			log.Infof("activated proxy id %v", proxyID)
-			// TODO: assuming one response limitation for now.
+			log.Infof("trying to activate proxy %v", pi.id)
+			pi.activator <- &api.TroubleShootingRequest{
+				RequestId: reqID,
+			}
+			log.Infof("activated proxy id %v", pi.id)
 			// TODO: here is wrong, using the same channel for one proxy accross different
 			// dbg session. cli-req1, cli-req2 both read from the same channel.
 			// can be avoided if we use diff channel in the first place.
 			// still write test case bash first.
-			data := <-pdata
-			log.Infof("received data from proxy id %v, now sending to the aggregators", proxyID)
-			c <- data
-		}(p)
+			// data := <-pdata
+			log.Infof("received data from proxy id %v, now sending to the aggregators", pi.id)
+		}(pi)
 	}
 
 	// TODO: hack since we know the number of resp in advance. use wait group in another go routine
@@ -111,6 +149,7 @@ func (s *Server) GetConfigDump(req *api.GetConfigDumpRequest, stream api.MeshTro
 			break
 		}
 		err := stream.Send(&api.GetConfigDumpResponse{Payload: cfg.Payload})
+		log.Infof("server -> cli, request id %v, payload %v, channel used %v", reqID, cfg.Payload, c)
 		if err != nil {
 			log.Errorf("failed to send, maybe stream closed ? %v", err)
 			return fmt.Errorf("failed to send, maybe stream closed ? %v", err)
@@ -123,8 +162,6 @@ func (s *Server) GetConfigDump(req *api.GetConfigDumpRequest, stream api.MeshTro
 // Troubleshoot is agent facing.
 func (s *Server) Troubleshoot(
 	stream api.ProxyTroubleshootingService_TroubleshootServer) error {
-	// rid := fmt.Sprintf("cli-req-%v", s.requestID)
-	// s.requestID++
 	log.Infof("troubleshooting stream starts")
 	md, ok := metadata.FromIncomingContext(stream.Context())
 	if !ok {
@@ -145,25 +182,22 @@ func (s *Server) Troubleshoot(
 		return err
 	}
 	s.updateProxyIDCache(proxyID)
-	log.Infof("request received %v, proxy ID %v, doing nothing util waiting for activator...\n",
+	log.Infof("initial agent connected %v, proxy ID %v, doing nothing util waiting for activator...\n",
 		in, proxyID)
 	go func() {
+		pi, ok := s.proxyMap[proxyID]
+		if !ok {
+			log.Fatalf("horrible things happened, not find activator")
+		}
 		for {
 			log.Infof("waiting for activator forever...")
-			// this is, cli req id assigned %v", rid) single stream should be okay to use id bound by outside scope, to be confirmed though.
-			a, ok := s.proxyActivator[proxyID]
-			if !ok {
-				log.Fatalf("horrible things happened, not find activator")
-			}
 			// waiting for activator instuctions.
-			<-a
-			rid := fmt.Sprintf("cli-req-%v", s.requestID)
-			s.requestID++
-			log.Infof("received channel, starting to plumbing info for this proxy, request id %v",
-				rid)
-			err := stream.Send(&api.TroubleShootingRequest{
-				RequestId: rid,
-			})
+			tsq := <-pi.activator
+			if tsq == nil {
+				log.Fatal("nil trouble shooting request from activator channel")
+			}
+			log.Infof("agent activated by cli request id %v", tsq.GetRequestId())
+			err := stream.Send(tsq)
 			if err != nil {
 				log.Errorf("stream to relay request failed %v", err)
 				return
@@ -177,16 +211,16 @@ func (s *Server) Troubleshoot(
 		if err != nil {
 			return err
 		}
-		c, ok := s.proxyMap[proxyID]
-		if !ok {
-			log.Errorf("failed to identify cache, oops, closing...")
-			return fmt.Errorf("oops")
+		reqID := in.GetRequestId()
+		if reqID == "" {
+			return fmt.Errorf("empty request id of the response from proxy")
 		}
-		log.Infof("sending response to the server")
-		c <- in
+		reqInfo, ok := s.requestMap[reqID]
+		if !ok {
+			log.Fatalf("failed to find request info for id %v", reqInfo.id)
+		}
+		log.Infof("received agent response, payload %v, for %v, sending back to channel %v",
+			in.GetPayload(), reqID, reqInfo.sink)
+		reqInfo.sink <- in
 	}
-}
-
-// TODO: refactor into this from troubleshoot.
-func (s *Server) proxyLoop(proxyID string) {
 }

@@ -1,0 +1,63 @@
+istiod started
+2019-12-30T22:09:09.702707Z	info	troubleshooting stream starts
+2019-12-30T22:09:09.703022Z	info	getting context metadata proxy1
+2019-12-30T22:09:09.703351Z	info	initial agent connected request_id:"proxy1" , proxy ID proxy1, doing nothing util waiting for activator...
+
+2019-12-30T22:09:09.703394Z	info	waiting for activator forever...
+2019-12-30T22:09:15.526938Z	info	GetConfigDump request: {id_prefix:"p"  iii-3 {} [] 0}, assigned req id iii-3, channel addr 0xc00023c120
+2019-12-30T22:09:15.526982Z	info	Selected proxies [proxy1]
+2019-12-30T22:09:15.526995Z	info	trying to activate proxy proxy1
+2019-12-30T22:09:15.527010Z	info	activated proxy id proxy1
+2019-12-30T22:09:15.527003Z	info	GetConfigDump request: {id_prefix:"p"  iii-4 {} [] 0}, assigned req id iii-4, channel addr 0xc000258120
+2019-12-30T22:09:15.527019Z	info	received data from proxy id proxy1, now sending to the aggregators
+2019-12-30T22:09:15.527024Z	info	Selected proxies [proxy1]
+2019-12-30T22:09:15.527026Z	info	agent activated by cli request id iii-3
+2019-12-30T22:09:15.527033Z	info	trying to activate proxy proxy1
+2019-12-30T22:09:15.527356Z	info	waiting for activator forever...
+2019-12-30T22:09:15.527397Z	info	agent activated by cli request id iii-4
+2019-12-30T22:09:15.527408Z	info	waiting for activator forever...
+2019-12-30T22:09:15.527414Z	info	activated proxy id proxy1
+2019-12-30T22:09:15.527419Z	info	received data from proxy id proxy1, now sending to the aggregators
+2019-12-30T22:09:15.684353Z	info	GetConfigDump request: {id_prefix:"p"  iii-5 {} [] 0}, assigned req id iii-5, channel addr 0xc00021e420
+2019-12-30T22:09:15.684386Z	info	Selected proxies [proxy1]
+2019-12-30T22:09:15.684402Z	info	trying to activate proxy proxy1
+2019-12-30T22:09:15.684414Z	info	activated proxy id proxy1
+2019-12-30T22:09:15.684420Z	info	received data from proxy id proxy1, now sending to the aggregators
+2019-12-30T22:09:15.684425Z	info	agent activated by cli request id iii-5
+2019-12-30T22:09:15.684436Z	info	waiting for activator forever...
+2019-12-30T22:09:15.751009Z	info	GetConfigDump request: {id_prefix:"p"  iii-1 {} [] 0}, assigned req id iii-1, channel addr 0xc00023c2a0
+2019-12-30T22:09:15.751042Z	info	Selected proxies [proxy1]
+2019-12-30T22:09:15.751055Z	info	trying to activate proxy proxy1
+2019-12-30T22:09:15.751066Z	info	activated proxy id proxy1
+2019-12-30T22:09:15.751070Z	info	received data from proxy id proxy1, now sending to the aggregators
+2019-12-30T22:09:15.751081Z	info	agent activated by cli request id iii-1
+2019-12-30T22:09:15.751114Z	info	waiting for activator forever...
+2019-12-30T22:09:15.794744Z	info	GetConfigDump request: {id_prefix:"p"  iii-2 {} [] 0}, assigned req id iii-2, channel addr 0xc00021e720
+2019-12-30T22:09:15.794775Z	info	Selected proxies [proxy1]
+2019-12-30T22:09:15.794792Z	info	trying to activate proxy proxy1
+2019-12-30T22:09:15.794808Z	info	activated proxy id proxy1
+2019-12-30T22:09:15.794812Z	info	received data from proxy id proxy1, now sending to the aggregators
+2019-12-30T22:09:15.794819Z	info	agent activated by cli request id iii-2
+2019-12-30T22:09:15.794833Z	info	waiting for activator forever...
+2019-12-30T22:09:16.528668Z	info	received agent response, payload response-proxy1-iii-3, for iii-3, sending back to channel 0xc00023c120
+2019-12-30T22:09:16.529028Z	info	server -> cli, request id iii-3, payload response-proxy1-iii-3, channel used 0xc00023c120
+2019-12-30T22:09:16.529040Z	info	finishing waiting all pieces are done
+2019-12-30T22:09:16.530922Z	info	transport: http2Server.HandleStreams failed to read frame: read tcp 127.0.0.1:8000->127.0.0.1:52070: read: connection reset by peer
+2019-12-30T22:09:16.531206Z	info	transport: loopyWriter.run returning. connection error: desc = "transport is closing"
+2019-12-30T22:09:16.795673Z	info	received agent response, payload response-proxy1-iii-2, for iii-2, sending back to channel 0xc00021e720
+2019-12-30T22:09:16.795727Z	info	server -> cli, request id iii-2, payload response-proxy1-iii-2, channel used 0xc00021e720
+2019-12-30T22:09:16.795732Z	info	finishing waiting all pieces are done
+2019-12-30T22:09:16.797637Z	info	transport: loopyWriter.run returning. connection error: desc = "transport is closing"
+2019-12-30T22:09:17.528575Z	info	received agent response, payload response-proxy1-iii-4, for iii-4, sending back to channel 0xc000258120
+2019-12-30T22:09:17.528631Z	info	server -> cli, request id iii-4, payload response-proxy1-iii-4, channel used 0xc000258120
+2019-12-30T22:09:17.528636Z	info	finishing waiting all pieces are done
+2019-12-30T22:09:17.530799Z	info	transport: loopyWriter.run returning. connection error: desc = "transport is closing"
+2019-12-30T22:09:17.685179Z	info	received agent response, payload response-proxy1-iii-5, for iii-5, sending back to channel 0xc00021e420
+2019-12-30T22:09:17.685236Z	info	server -> cli, request id iii-5, payload response-proxy1-iii-5, channel used 0xc00021e420
+2019-12-30T22:09:17.685239Z	info	finishing waiting all pieces are done
+2019-12-30T22:09:17.687460Z	info	transport: loopyWriter.run returning. connection error: desc = "transport is closing"
+2019-12-30T22:09:19.751968Z	info	received agent response, payload response-proxy1-iii-1, for iii-1, sending back to channel 0xc00023c2a0
+2019-12-30T22:09:19.752017Z	info	server -> cli, request id iii-1, payload response-proxy1-iii-1, channel used 0xc00023c2a0
+2019-12-30T22:09:19.752020Z	info	finishing waiting all pieces are done
+2019-12-30T22:09:19.754078Z	info	transport: http2Server.HandleStreams failed to read frame: read tcp 127.0.0.1:8000->127.0.0.1:52090: read: connection reset by peer
+2019-12-30T22:09:19.754177Z	info	transport: loopyWriter.run returning. connection error: desc = "transport is closing"

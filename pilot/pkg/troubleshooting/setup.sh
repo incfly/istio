@@ -40,11 +40,14 @@ cli() {
 # 2019-12-30T20:21:39.366402Z	info	respose is {response-proxy1-cli-req-1 {} [] 0}
 multiclient() {
   rm -rf output/ && mkdir output/
-  for i in `seq 1 10`; do
-    echo "req $i started"; echo "starting with $i" > output/$i.txt;
-    source ./setup.sh && cli  -s  'p' 2>&1 | grep 'respose is' >> output/$i.txt & ;
+  for i in `seq 1 5`; do
+    # Bash parallel in for loop is noter deterministically... will be out of order by itself...
+    # fixing by adding param explicitly as part of rpc.
+    # TODO: understand bash behavior...
+    echo "req $i started"; echo "starting with iii-$i" > output/$i.txt;
+    source ./setup.sh && cli  -s  'p' -r "iii-$i" 2>&1 | grep 'respose is' >> output/$i.txt & ;
   done
   # wait for some time all finishes.
-  sleep 20
+  sleep 10
   cat output/* > somefile.txt
 }

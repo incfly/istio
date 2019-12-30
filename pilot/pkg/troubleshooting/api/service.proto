@@ -25,6 +25,10 @@ message Selector {
 
 message GetConfigDumpRequest{
   Selector selector = 1;
+  // serving as a tracing debugging field, most time request id is auto generated.
+  // we can't use metadata due to our setup of the server/agent using one stream per lifetime.
+  // therefore, using a special nuance field for debugging purpose.
+  string request_id = 2;
 }
 
 message GetConfigDumpResponse{

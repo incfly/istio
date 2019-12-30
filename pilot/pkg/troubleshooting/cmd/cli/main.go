@@ -13,6 +13,7 @@ import (
 
 var (
 	idPrefix string
+	reqID    string
 	rootCmd  cobra.Command = cobra.Command{
 		Use: "agent, to be replaced by pilot agent",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -27,6 +28,7 @@ var (
 				Selector: &api.Selector{
 					IdPrefix: idPrefix,
 				},
+				RequestId: reqID,
 			})
 			if err != nil {
 				log.Fatalf("failed to set up stream %v", err)
@@ -45,6 +47,8 @@ var (
 func init() {
 	rootCmd.PersistentFlags().StringVarP(
 		&idPrefix, "selector", "s", "proxy1", "the prefix of the proxy id as selector")
+	rootCmd.PersistentFlags().StringVarP(
+		&reqID, "request", "r", "", "the request id for debugging")
 }
 
 func main() {
