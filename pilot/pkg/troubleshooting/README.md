@@ -37,6 +37,17 @@ source ./setup.sh&& agent -i 'proxy1' | tee client.log
 source ./setup.sh && multiclient
 ```
 
+## Notes
+
+2020/1/2 discussion
+
+- api server only do uri based authorization, not payload, which can touch multi namespace.
+- authorization check can be done at single entry replica
+- need a design for request not always fan out
+  - diff metadata
+  - diff grpc
+  - different port.
+
 ## TODO
 
 In right order.
@@ -48,7 +59,6 @@ Verify
 
 1. maybe tracking map when connection is lost?
 1. HTTP libraries for sending request to config dump interface.
-
 1. request log scope formatting polishing, requets id, proxy id, as base context.
 
 ### DONE
