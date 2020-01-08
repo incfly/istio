@@ -52,6 +52,11 @@ source ./setup.sh && multiclient
 
 In right order.
 
+1. Things working E2E.
+  1. Standalone separate server.
+  1. Client compile into istiod agent.
+  1. Dial against server. Hardcoded.
+  1. Port forwarding tryout e2e.
 1. GC requestMap, proxyInfo map.
 
 Verify

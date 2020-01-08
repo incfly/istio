@@ -4,6 +4,17 @@ proto() {
   protoc --go_out=plugins=grpc:. api/service.proto
 }
 
+# build() {
+#   go build -o ts-server 
+# }
+
+docker-build() {
+  pushd cmd/server
+  go build -o ts-server main.go
+  docker build . -t gcr.io/jianfeih-test/ts-server:0108a
+  popd
+}
+
 server() {
   go run ./cmd/istiod "$@"
 }

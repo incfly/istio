@@ -19,6 +19,8 @@ import (
 type requestChan chan *api.TroubleShootingResponse
 
 type Server struct {
+	// the port to listen on
+	port uint32
 	// last used requestID watermark.
 	requestID int
 	// current set, string is the pod id.
@@ -26,6 +28,12 @@ type Server struct {
 	proxyMap map[string]*proxyInfo
 	// map from requestID to request related info.
 	requestMap map[string]*requestInfo
+}
+
+// ServerConfig is the config to start the troubleshooting server.
+type ServerConfig struct {
+	// Port the port to listen on. Same for both cli side and agent side.
+	Port uint32
 }
 
 type proxyInfo struct {
@@ -39,8 +47,9 @@ type requestInfo struct {
 	sink requestChan
 }
 
-func NewServer() (*Server, error) {
+func NewServer(cfg *ServerConfig) (*Server, error) {
 	return &Server{
+		port:       cfg.Port,
 		requestID:  1,
 		proxyMap:   make(map[string]*proxyInfo),
 		requestMap: make(map[string]*requestInfo),
@@ -49,7 +58,8 @@ func NewServer() (*Server, error) {
 
 // TODO: stop channel adding.
 func (s *Server) Start() error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 8000))
+	log.Infof("Starting to listen on %v", s.port)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%v", s.port))
 	if err != nil {
 		return fmt.Errorf("failed to listen: %v", err)
 	}
