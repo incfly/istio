@@ -2661,6 +2661,33 @@ func TestValidateDestinationRule(t *testing.T) {
 				{Name: "v2", Labels: map[string]string{"version": "v2"}},
 			},
 		}, valid: true},
+
+		{name: "negative consecutive errors", in: &networking.DestinationRule{
+			Host: "reviews",
+			TrafficPolicy: &networking.TrafficPolicy{
+				OutlierDetection: &networking.OutlierDetection{
+					ConsecutiveErrors: -1,
+				},
+			},
+			Subsets: []*networking.Subset{
+				{Name: "v1", Labels: map[string]string{"version": "v1"}},
+				{Name: "v2", Labels: map[string]string{"version": "v2"}},
+			},
+		}, valid: false},
+
+		{name: "deprecated consecutive errors set together with consecutive 5xx errors", in: &networking.DestinationRule{
+			Host: "reviews",
+			TrafficPolicy: &networking.TrafficPolicy{
+				OutlierDetection: &networking.OutlierDetection{
+					ConsecutiveErrors:     3,
+					Consecutive_5XxErrors: &types.UInt32Value{Value: 3},
+				},
+			},
+			Subsets: []*networking.Subset{
+				{Name: "v1", Labels: map[string]string{"version": "v1"}},
+				{Name: "v2", Labels: map[string]string{"version": "v2"}},
+			},
+		}, valid: false},
 	}
 	for _, c := range cases {
 		if got := ValidateDestinationRule(someName, someNamespace, c.in); (got == nil) != c.valid {
@@ -5172,7 +5199,7 @@ func TestValidateRequestAuthentication(t *testing.T) {
 			name:       "empty jwt rule",
 			configName: constants.DefaultAuthenticationPolicyName,
 			in: &security_beta.RequestAuthentication{
-				JwtRules: []*security_beta.JWT{
+				JwtRules: []*security_beta.JWTRule{
 					{},
 				},
 			},
@@ -5182,7 +5209,7 @@ func TestValidateRequestAuthentication(t *testing.T) {
 			name:       "empty issuer",
 			configName: constants.DefaultAuthenticationPolicyName,
 			in: &security_beta.RequestAuthentication{
-				JwtRules: []*security_beta.JWT{
+				JwtRules: []*security_beta.JWTRule{
 					{
 						Issuer: "",
 					},
@@ -5194,7 +5221,7 @@ func TestValidateRequestAuthentication(t *testing.T) {
 			name:       "bad JwksUri - no protocol",
 			configName: constants.DefaultAuthenticationPolicyName,
 			in: &security_beta.RequestAuthentication{
-				JwtRules: []*security_beta.JWT{
+				JwtRules: []*security_beta.JWTRule{
 					{
 						Issuer:  "foo.com",
 						JwksUri: "foo.com",
@@ -5207,7 +5234,7 @@ func TestValidateRequestAuthentication(t *testing.T) {
 			name:       "bad JwksUri - invalid port",
 			configName: constants.DefaultAuthenticationPolicyName,
 			in: &security_beta.RequestAuthentication{
-				JwtRules: []*security_beta.JWT{
+				JwtRules: []*security_beta.JWTRule{
 					{
 						Issuer:  "foo.com",
 						JwksUri: "https://foo.com:not-a-number",
@@ -5226,7 +5253,7 @@ func TestValidateRequestAuthentication(t *testing.T) {
 						"version": "",
 					},
 				},
-				JwtRules: []*security_beta.JWT{
+				JwtRules: []*security_beta.JWTRule{
 					{
 						Issuer:  "foo.com",
 						JwksUri: "https://foo.com/cert",
@@ -5245,7 +5272,7 @@ func TestValidateRequestAuthentication(t *testing.T) {
 						"":    "v1",
 					},
 				},
-				JwtRules: []*security_beta.JWT{
+				JwtRules: []*security_beta.JWTRule{
 					{
 						Issuer:  "foo.com",
 						JwksUri: "https://foo.com/cert",
@@ -5258,7 +5285,7 @@ func TestValidateRequestAuthentication(t *testing.T) {
 			name:       "bad header location",
 			configName: constants.DefaultAuthenticationPolicyName,
 			in: &security_beta.RequestAuthentication{
-				JwtRules: []*security_beta.JWT{
+				JwtRules: []*security_beta.JWTRule{
 					{
 						Issuer:  "foo.com",
 						JwksUri: "https://foo.com",
@@ -5277,7 +5304,7 @@ func TestValidateRequestAuthentication(t *testing.T) {
 			name:       "bad param location",
 			configName: constants.DefaultAuthenticationPolicyName,
 			in: &security_beta.RequestAuthentication{
-				JwtRules: []*security_beta.JWT{
+				JwtRules: []*security_beta.JWTRule{
 					{
 						Issuer:     "foo.com",
 						JwksUri:    "https://foo.com",
@@ -5291,7 +5318,7 @@ func TestValidateRequestAuthentication(t *testing.T) {
 			name:       "good",
 			configName: constants.DefaultAuthenticationPolicyName,
 			in: &security_beta.RequestAuthentication{
-				JwtRules: []*security_beta.JWT{
+				JwtRules: []*security_beta.JWTRule{
 					{
 						Issuer:  "foo.com",
 						JwksUri: "https://foo.com",

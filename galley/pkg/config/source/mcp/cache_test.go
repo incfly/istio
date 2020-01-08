@@ -15,7 +15,6 @@
 package mcp
 
 import (
-	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -28,13 +27,24 @@ import (
 	"istio.io/api/networking/v1alpha3"
 
 	"istio.io/istio/galley/pkg/config/event"
-	"istio.io/istio/galley/pkg/config/meta/schema/collection"
 	"istio.io/istio/galley/pkg/config/resource"
+	"istio.io/istio/galley/pkg/config/schema/collection"
+	resource2 "istio.io/istio/galley/pkg/config/schema/resource"
+	"istio.io/istio/galley/pkg/config/testing/fixtures"
 	"istio.io/istio/pkg/mcp/sink"
 )
 
 var (
-	colName   = name("ns/mycol")
+	testCollection = collection.Builder{
+		Name: "ns/mycol",
+		Resource: resource2.Builder{
+			Kind:         "Empty",
+			Plural:       "empties",
+			ProtoPackage: "github.com/gogo/protobuf/types",
+			Proto:        "google.protobuf.Empty",
+		}.MustBuild(),
+	}.MustBuild()
+
 	eventTime = time.Now().UTC()
 	fullSync  = output{
 		kind: event.FullSync,
@@ -270,10 +280,6 @@ func TestFullUpdate(t *testing.T) {
 		})
 }
 
-func name(n string) collection.Name {
-	return collection.NewName(n)
-}
-
 type cacheHelper struct {
 	*cache
 
@@ -282,7 +288,7 @@ type cacheHelper struct {
 
 func newCacheHelper() *cacheHelper {
 	c := &cacheHelper{
-		cache: newCache(colName),
+		cache: newCache(testCollection),
 	}
 	c.Dispatch(event.HandlerFromFn(func(e event.Event) {
 		c.events = append(c.events, e)
@@ -326,9 +332,7 @@ func (c *cacheHelper) expect(t *testing.T, expectedOutput ...output) {
 
 	for i, actual := range c.events {
 		expected := expectedEvents[i]
-		if !reflect.DeepEqual(actual, expected) {
-			t.Fatalf("expected:\n%v\nto equal:\n%v", actual, expected)
-		}
+		fixtures.ExpectEqual(t, actual, expected)
 	}
 }
 
@@ -348,10 +352,10 @@ func sortEvents(events []event.Event) {
 }
 
 func resourceName(e event.Event) string {
-	if e.Entry == nil {
+	if e.Resource == nil {
 		return ""
 	}
-	return e.Entry.Metadata.Name.String()
+	return e.Resource.Metadata.FullName.String()
 }
 
 func protoTime(t time.Time) *types.Timestamp {
@@ -369,7 +373,7 @@ type change struct {
 func (c change) toMCP() *sink.Change {
 	col := c.collection
 	if col == "" {
-		col = colName.String()
+		col = testCollection.Name().String()
 	}
 	return &sink.Change{
 		Incremental: c.incremental,
@@ -423,21 +427,22 @@ type output struct {
 
 func (e output) toEvent() event.Event {
 	if e.kind == event.FullSync {
-		return event.FullSyncFor(colName)
+		return event.FullSyncFor(testCollection)
 	}
 
-	fullName, _ := resource.NewFullName(e.name)
+	fullName, _ := resource.ParseFullName(e.name)
 	return event.Event{
 		Kind:   e.kind,
-		Source: colName,
-		Entry: &resource.Entry{
+		Source: testCollection,
+		Resource: &resource.Instance{
 			Metadata: resource.Metadata{
-				Name:       fullName,
+				FullName:   fullName,
 				CreateTime: eventTime,
 				Version:    "v1",
+				Schema:     testCollection.Resource(),
 			},
-			Item:   e.body,
-			Origin: defaultOrigin,
+			Message: e.body,
+			Origin:  defaultOrigin,
 		},
 	}
 }

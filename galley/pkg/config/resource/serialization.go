@@ -15,28 +15,31 @@
 package resource
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/gogo/protobuf/types"
 
 	mcp "istio.io/api/mcp/v1alpha1"
 	"istio.io/pkg/log"
+
+	"istio.io/istio/galley/pkg/config/schema/resource"
 )
 
 var scope = log.RegisterScope("resource", "Core resource model scope", 0)
 
 // Serialize converts a resource entry into its enveloped form.
-func Serialize(e *Entry) (*mcp.Resource, error) {
+func Serialize(r *Instance) (*mcp.Resource, error) {
 
-	a, err := types.MarshalAny(e.Item)
+	a, err := types.MarshalAny(r.Message)
 	if err != nil {
-		scope.Errorf("Error serializing proto from source e: %v:", e)
+		scope.Errorf("Error serializing proto from source r: %v:", r)
 		return nil, err
 	}
 
-	metadata, err := SerializeMetadata(e.Metadata)
+	metadata, err := SerializeMetadata(r.Metadata)
 	if err != nil {
-		scope.Errorf("Error serializing metadata for event (%v): %v", e, err)
+		scope.Errorf("Error serializing metadata for event (%v): %v", r, err)
 		return nil, err
 	}
 
@@ -49,8 +52,8 @@ func Serialize(e *Entry) (*mcp.Resource, error) {
 }
 
 // MustSerialize converts a resource entry into its enveloped form or panics if it cannot.
-func MustSerialize(e *Entry) *mcp.Resource {
-	m, err := Serialize(e)
+func MustSerialize(r *Instance) *mcp.Resource {
+	m, err := Serialize(r)
 	if err != nil {
 		panic(fmt.Sprintf("resource.MustSerialize: %v", err))
 	}
@@ -58,10 +61,10 @@ func MustSerialize(e *Entry) *mcp.Resource {
 }
 
 // SerializeAll envelopes and returns all the entries.
-func SerializeAll(entries []*Entry) ([]*mcp.Resource, error) {
-	result := make([]*mcp.Resource, len(entries))
-	for i, e := range entries {
-		r, err := Serialize(e)
+func SerializeAll(resources []*Instance) ([]*mcp.Resource, error) {
+	result := make([]*mcp.Resource, len(resources))
+	for i, r := range resources {
+		r, err := Serialize(r)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +82,7 @@ func SerializeMetadata(m Metadata) (*mcp.Metadata, error) {
 	}
 
 	return &mcp.Metadata{
-		Name:        m.Name.String(),
+		Name:        m.FullName.String(),
 		CreateTime:  createTime,
 		Version:     string(m.Version),
 		Annotations: m.Annotations,
@@ -88,13 +91,13 @@ func SerializeMetadata(m Metadata) (*mcp.Metadata, error) {
 }
 
 // Deserialize an entry from an envelope.
-func Deserialize(e *mcp.Resource) (*Entry, error) {
+func Deserialize(e *mcp.Resource, s resource.Schema) (*Instance, error) {
 	p, err := types.EmptyAny(e.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling proto: %v", err)
 	}
 
-	metadata, err := DeserializeMetadata(e.Metadata)
+	metadata, err := DeserializeMetadata(e.Metadata, s)
 	if err != nil {
 		return nil, err
 	}
@@ -103,15 +106,15 @@ func Deserialize(e *mcp.Resource) (*Entry, error) {
 		return nil, fmt.Errorf("error unmarshaling body: %v", err)
 	}
 
-	return &Entry{
+	return &Instance{
 		Metadata: metadata,
-		Item:     p,
+		Message:  p,
 	}, nil
 }
 
 // MustDeserialize deserializes an entry from an envelope or panics.
-func MustDeserialize(e *mcp.Resource) *Entry {
-	m, err := Deserialize(e)
+func MustDeserialize(e *mcp.Resource, s resource.Schema) *Instance {
+	m, err := Deserialize(e, s)
 	if err != nil {
 		panic(fmt.Sprintf("resource.MustDeserialize: %v", err))
 	}
@@ -119,10 +122,10 @@ func MustDeserialize(e *mcp.Resource) *Entry {
 }
 
 // DeserializeAll extracts all entries from the given envelopes and returns.
-func DeserializeAll(es []*mcp.Resource) ([]*Entry, error) {
-	result := make([]*Entry, len(es))
+func DeserializeAll(es []*mcp.Resource, s resource.Schema) ([]*Instance, error) {
+	result := make([]*Instance, len(es))
 	for i, e := range es {
-		r, err := Deserialize(e)
+		r, err := Deserialize(e, s)
 		if err != nil {
 			return nil, err
 		}
@@ -132,17 +135,27 @@ func DeserializeAll(es []*mcp.Resource) ([]*Entry, error) {
 }
 
 // DeserializeMetadata extracts metadata portion of the envelope
-func DeserializeMetadata(m *mcp.Metadata) (Metadata, error) {
+func DeserializeMetadata(m *mcp.Metadata, s resource.Schema) (Metadata, error) {
+	if s == nil {
+		return Metadata{}, errors.New("error unmarshaling metadata. Resource schema must not be nil")
+	}
+
 	createTime, err := types.TimestampFromProto(m.CreateTime)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("error unmarshaling create time: %v", err)
 	}
 
+	name, err := ParseFullName(m.Name)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("error unmarshaling name: %v", err)
+	}
+
 	return Metadata{
-		Name:        Name{m.Name},
+		FullName:    name,
 		CreateTime:  createTime,
 		Version:     Version(m.Version),
 		Annotations: m.Annotations,
 		Labels:      m.Labels,
+		Schema:      s,
 	}, nil
 }

@@ -98,7 +98,7 @@ var (
 	k8sInCluster = env.RegisterStringVar("KUBERNETES_SERVICE_HOST", "",
 		"Kuberenetes service host, set automatically when running in-cluster")
 
-	// JWTPath is the well-knwon location of the projected K8S JWT. This is mounted on all workloads, as well as istiod.
+	// JWTPath is the well-known location of the projected K8S JWT. This is mounted on all workloads, as well as istiod.
 	// In a cluster that doesn't support projected JWTs we can't run the CA functionality of istiod - instead
 	// old-style Citadel must be run, with Secret created for each workload.
 	JWTPath = "./var/run/secrets/tokens/istio-token"
@@ -127,7 +127,7 @@ type CAOptions struct {
 // Protected by installer options: the CA will be started only if the JWT token in /var/run/secrets
 // is mounted. If it is missing - for example old versions of K8S that don't support such tokens -
 // we will not start the cert-signing server, since pods will have no way to authenticate.
-func (s *Server) RunCA(grpc *grpc.Server, opts *CAOptions) {
+func (s *Server) RunCA(grpc *grpc.Server, opts *CAOptions, stopCh <-chan struct{}) {
 	if s.kubeClient == nil {
 		// No k8s - no self-signed certs.
 		// TODO: implement it using a local directory, for non-k8s env.
@@ -191,6 +191,14 @@ func (s *Server) RunCA(grpc *grpc.Server, opts *CAOptions) {
 		log.Warnf("Failed to start GRPC server with error: %v", serverErr)
 	}
 	log.Info("Istiod CA has started")
+
+	nc, err := NewNamespaceController(ca, s.kubeClient.CoreV1())
+	if err != nil {
+		log.Warnf("failed to start istiod namespace controller, error: %v", err)
+	} else {
+		nc.Run(stopCh)
+		log.Info("istiod namespace controller has started")
+	}
 }
 
 type jwtAuthenticator struct {

@@ -22,7 +22,7 @@ SHELL := /bin/bash -o pipefail
 VERSION ?= 1.5-dev
 
 # Base version of Istio image to use
-BASE_VERSION ?= 1.5-dev.0
+BASE_VERSION ?= 1.5-dev.1
 
 export GO111MODULE ?= on
 export GOPROXY ?= https://proxy.golang.org
@@ -258,7 +258,6 @@ BINARIES:=./istioctl/cmd/istioctl \
   ./pkg/test/echo/cmd/client \
   ./pkg/test/echo/cmd/server \
   ./mixer/test/policybackend \
-  ./tools/hyperistio \
   ./tools/istio-iptables \
   ./tools/istio-clean-iptables
 
@@ -333,7 +332,7 @@ lint: lint-go-split lint-python lint-copyright-banner lint-scripts lint-dockerfi
 go-gen:
 	@mkdir -p /tmp/bin
 	@go build -o /tmp/bin/mixgen "${REPO_ROOT}/mixer/tools/mixgen/main.go"
-	@PATH=${PATH}:/tmp/bin go generate ./...
+	@PATH="${PATH}":/tmp/bin go generate ./...
 
 gen: go-gen mirror-licenses format update-crds
 
@@ -438,8 +437,8 @@ security-test:
 common-test: build
 	go test ${T} ./pkg/...
 	go test ${T} ./tests/common/...
+	go test ${T} ./tools/istio-iptables/...
 	# Execute bash shell unit tests scripts
-	./tests/scripts/scripts_test.sh
 	./tests/scripts/istio-iptables-test.sh
 
 .PHONY: selected-pkg-test
