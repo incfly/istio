@@ -107,12 +107,31 @@ func (s *Server) updateRequestInfoMap(input string) (string, error) {
 	return out, nil
 }
 
+func (s *Server) cleanupRequestID(id string) error {
+	_, ok := s.requestMap[id]
+	if !ok {
+		return fmt.Errorf("request id not exists, %v", id)
+	}
+	// close chan, should be better than delete without closing? i think?
+	// look up.
+	close(s.requestMap[id].sink)
+	delete(s.requestMap, id)
+	return nil
+}
+
 // Facing istioctl.
 func (s *Server) GetConfigDump(req *api.GetConfigDumpRequest, stream api.MeshTroubleshootingService_GetConfigDumpServer) error {
 	reqID, err := s.updateRequestInfoMap(req.GetRequestId())
 	if err != nil {
 		return fmt.Errorf("failed in request map update %v", err)
 	}
+
+	defer func() {
+		if err := s.cleanupRequestID(reqID); err != nil {
+			log.Errorf("failed to clean up for request id %v", reqID)
+		}
+	}()
+
 	c := s.requestMap[reqID].sink
 	log.Infof("GetConfigDump request: %v, assigned req id %v, channel addr %v", *req, reqID, c)
 	ps := s.matchProxy(req.GetSelector())
@@ -215,8 +234,8 @@ func (s *Server) Troubleshoot(
 		if !ok {
 			log.Fatalf("failed to find request info for id %v", reqInfo.id)
 		}
-		log.Infof("received agent response, payload %v, for %v, sending back to channel %v",
-			in.GetPayload(), reqID, reqInfo.sink)
+		log.Infof("received agent response for %v, sending back to channel %v, first 20 bytes:\n%v\n",
+			reqID, reqInfo.sink, in.GetPayload()[:20])
 		reqInfo.sink <- in
 	}
 }

@@ -77,22 +77,21 @@ source setup.sh; deploy
 
 In right order.
 
+1. Propogate sidecar actual id to the proxy id.
+1. Tie response to the proxy id.
+1. GC management for the proxy id in the map, when connection is lost.
+1. request log scope formatting polishing, requets id, proxy id, as base context.
+
+### DONE
+
+1. GC requestMap, proxyInfo map.
+  1. without this, unable to invoke twice. need manual specifying request id. wrong
+
 1. Things working E2E.
   1. Standalone separate server.
   1. Client compile into istiod agent.
   1. Dial against server. Hardcoded.
   1. Port forwarding tryout e2e.
-1. GC requestMap, proxyInfo map.
-  1. without this, unable to invoke twice. need manual specifying request id. wrong
-
-Verify
-  1. impl some basic non-trivial msg handling in the agent svc, based on req payload.
-
-1. maybe tracking map when connection is lost?
-1. HTTP libraries for sending request to config dump interface.
-1. request log scope formatting polishing, requets id, proxy id, as base context.
-
-### DONE
 
 1. actual respect the requestId. incrementing.
 

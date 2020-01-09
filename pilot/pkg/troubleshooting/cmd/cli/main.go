@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -23,6 +24,11 @@ var (
 				log.Fatalf("failed to dial connection %v", err)
 			}
 			client := api.NewMeshTroubleshootingServiceClient(conn)
+
+			// generated one if not specified via cli.
+			if reqID == "" {
+				reqID = time.Now().Format(time.Stamp)
+			}
 			// send a request to server.
 			stream, err := client.GetConfigDump(context.Background(), &api.GetConfigDumpRequest{
 				Selector: &api.Selector{

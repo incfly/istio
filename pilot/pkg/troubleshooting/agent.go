@@ -68,7 +68,7 @@ func (c *Agent) Start() error {
 			log.Infof("error from stream recv %v", err)
 			return err
 		}
-		log.Infof("received server info: %v", in.RequestId)
+		log.Infof("Received troubleshooting request, request id = %v", in.RequestId)
 		// for each debugging request sent from server, fullfil the request in a separate goroutine.
 		go c.handleRequest(stream, in)
 	}

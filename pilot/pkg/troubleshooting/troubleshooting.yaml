@@ -82,7 +82,7 @@ spec:
     spec:
       containers:
       - image: docker.io/kennethreitz/httpbin
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         name: httpbin
         ports:
         - containerPort: 80

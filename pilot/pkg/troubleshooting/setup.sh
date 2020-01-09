@@ -23,8 +23,8 @@ docker-build() {
 
 deploy() {
   krmpo -nistio-system -lapp=ts-server
-  k apply -f ./troubleshooting.yaml
   krmpo -lapp=httpbin
+  k apply -f ./troubleshooting.yaml
   k logs -lapp=httpbin -c istio-proxy -f
 }
 
