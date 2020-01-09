@@ -114,6 +114,14 @@ why need the request id? because agent sharing the same stream with different is
   1. multiple find.
 
 
-## QA
+## QA & Ideas
 
-Does gRPC context auto populate metadata for the tracing? Or code required?
+Ideas
+
+- Make istioctl anlyzing functionatlity of envoy config can consume streaming stdin:
+
+  ```shell
+  istioctl troubleshooting --selector='app=foo' | istioctl proxy-config
+  ```
+
+- Does gRPC context auto populate metadata for the tracing? Or code required?
