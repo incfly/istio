@@ -3,7 +3,9 @@ package troubleshooting
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"time"
 
 	"google.golang.org/grpc"
@@ -78,12 +80,31 @@ func (c *Agent) handleRequest(
 	delay := time.Duration(rand.Intn(5)) * time.Second
 	log.Infof("delay duration %v before responded", delay)
 	time.Sleep(delay)
+	cfg, err := getConfigDump()
+	if err != nil {
+		log.Errorf("failed to send response: %v", err)
+		cfg = fmt.Sprintf("response %v", err)
+	}
 	resp := &api.TroubleShootingResponse{
 		RequestId: req.RequestId,
-		Payload:   fmt.Sprintf("response-%v-%v", c.proxyID, req.GetRequestId()),
+		Payload:   cfg,
+		// Payload:   fmt.Sprintf("response-%v-%v", c.proxyID, req.GetRequestId()),
 	}
 	if err := stream.Send(resp); err != nil {
 		log.Errorf("failed to send the response %v", err)
 	}
 	log.Infof("finish handling request: %v", req.RequestId)
+}
+
+func getConfigDump() (string, error) {
+	resp, err := http.Get("http://localhost:15000/config_dump")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }
