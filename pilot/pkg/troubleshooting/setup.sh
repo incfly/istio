@@ -12,7 +12,20 @@ docker-build() {
   pushd cmd/server
   go build -o ts-server main.go
   docker build . -t gcr.io/jianfeih-test/ts-server:0108a
+  docker push gcr.io/jianfeih-test/ts-server:0108a
   popd
+
+  pushd "${GOPATH}/src/istio.io/istio"
+  export TAG="0108a" HUB="gcr.io/jianfeih-test"
+  make docker.proxyv2 && docker push "gcr.io/jianfeih-test/proxyv2:${TAG}"
+  popd
+}
+
+deploy() {
+  krmpo -nistio-system -lapp=ts-server
+  k apply -f ./troubleshooting.yaml
+  krmpo -lapp=httpbin
+  k logs -lapp=httpbin -c istio-proxy -f
 }
 
 server() {

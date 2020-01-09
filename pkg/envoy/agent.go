@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	ts "istio.io/istio/pilot/pkg/troubleshooting"
 	"istio.io/pkg/log"
 )
 
@@ -96,6 +97,8 @@ type Proxy interface {
 }
 
 type agent struct {
+	// agent troubleshooting client side.
+	troubleshootingAgent *ts.Agent
 	// proxy commands
 	proxy Proxy
 
@@ -209,6 +212,11 @@ func (a *agent) isActive(epoch int) bool {
 
 func (a *agent) Run(ctx context.Context) error {
 	log.Info("Starting proxy agent")
+	go func() {
+		if err := a.runTroubleShooting(); err != nil {
+			log.Errorf("failed to run trouble shooting agent %v", err)
+		}
+	}()
 	for {
 		select {
 		case status := <-a.statusCh:

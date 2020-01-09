@@ -168,10 +168,9 @@ func (s *Server) Troubleshoot(
 	proxyID := md.Get("proxyID")[0]
 	log.Infof("getting context metadata %v", proxyID)
 
-	// sanity check of the proxy id.
-	if !strings.HasPrefix(proxyID, "proxy") {
-		log.Errorf("first req agent must pass the proxy id, please, %v", proxyID)
-		return fmt.Errorf("first req agent must pass the proxy id, please, %v", proxyID)
+	if proxyID == "" {
+		log.Errorf("No proxy id found, first req agent must pass the proxy id")
+		return fmt.Errorf("empty proxy id")
 	}
 	// consuming out the first request.
 	in, err := stream.Recv()

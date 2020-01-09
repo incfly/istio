@@ -37,6 +37,31 @@ source ./setup.sh&& agent -i 'proxy1' | tee client.log
 source ./setup.sh && multiclient
 ```
 
+### Kubernetes Workflow
+
+Deploy service
+
+```shell
+kubectl apply -f ./troubleshooting.yaml
+```
+
+Observing, each in separate terminal window.
+
+```shell
+kpfn istio-system $(kpidn istio-system -lapp=ts-server) 8000
+klo -lapp=httpbin -c istio-proxy -f
+klon istio-system -lapp=ts-server
+source ./setup.sh && cli  -s  'sidecar' -r $(date)
+```
+
+Rebuild
+
+```shell
+source setup.sh; docker-build
+source setup.sh; deploy
+```
+
+
 ## Notes
 
 2020/1/2 discussion
@@ -58,6 +83,7 @@ In right order.
   1. Dial against server. Hardcoded.
   1. Port forwarding tryout e2e.
 1. GC requestMap, proxyInfo map.
+  1. without this, unable to invoke twice. need manual specifying request id. wrong
 
 Verify
   1. impl some basic non-trivial msg handling in the agent svc, based on req payload.

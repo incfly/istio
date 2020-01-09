@@ -15,6 +15,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ts-server
+  namespace: "istio-system"
   labels:
     app: ts-server
 spec:
@@ -29,6 +30,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ts-server
+  namespace: "istio-system"
 spec:
   replicas: 1
   selector:
@@ -45,3 +47,42 @@ spec:
         name: ts
         ports:
         - containerPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httpbin
+  labels:
+    app: httpbin
+spec:
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 80
+  selector:
+    app: httpbin
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpbin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: httpbin
+      version: v1
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/proxyImage: gcr.io/jianfeih-test/proxyv2:0108a
+      labels:
+        app: httpbin
+        version: v1
+    spec:
+      containers:
+      - image: docker.io/kennethreitz/httpbin
+        imagePullPolicy: IfNotPresent
+        name: httpbin
+        ports:
+        - containerPort: 80

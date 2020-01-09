@@ -20,13 +20,15 @@ type Agent struct {
 }
 
 type AgentConfig struct {
-	ID    string
-	Delay time.Duration
+	ID string
+	// ServiceAddress is the address the trouble shooting agent is supposed to connected to.
+	ServiceAddress string
+	Delay          time.Duration
 }
 
 // gRPC client, but the actual information server, runs on istio agent/pilot agent.
 func NewAgent(c *AgentConfig) (*Agent, error) {
-	conn, err := grpc.Dial("localhost:8000", grpc.WithInsecure())
+	conn, err := grpc.Dial(c.ServiceAddress, grpc.WithInsecure()) // TODO: mtls config.
 	if err != nil {
 		return nil, err
 	}
