@@ -2,4 +2,8 @@
 FROM ubuntu:bionic
 
 COPY ts-server /usr/local/bin/
+
+COPY server.crt /server.crt
+COPY server.key /server.key
+
 ENTRYPOINT ["/usr/local/bin/ts-server"]
