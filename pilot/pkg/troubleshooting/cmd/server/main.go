@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	// "time"
 
 	"github.com/spf13/cobra"
 	ts "istio.io/istio/pilot/pkg/troubleshooting"
@@ -29,14 +30,40 @@ var (
 )
 
 func startAPIService() {
+	// https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/apiserver-aggregation/
+	// just sleep does not work...
+
+	// don't think push will help either...
+	// https://blog.golang.org/h2push. request forwarded to the handler?
+	// can this be treated as separate request increase timeout? should not...
 	log.Infof("starting api server on port 9000")
 	// starting istioctl facing echo service in front of apiserver.
 	srv := &http.Server{Addr: ":9000", Handler: http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			// Log the request protocol
-			log.Infof("Got connection: %s", r.Proto)
+			log.Infof("Got connection: %s, path %v", r.Proto, r.URL.Path)
+			// if r.URL.Path == "/push-test" {
+			// 	w.Write([]byte("push response"))
+			// 	return
+			// }
 			// Send a message back to the client
 			w.Write([]byte("Hello"))
+			// pusher, ok := w.(http.Pusher)
+			// if !ok {
+			// 	log.Errorf("failed to do push")
+			// }
+			// ErrNotSupported, feature not supported error.
+			// if err := pusher.Push("/push-test", nil); err != nil {
+			// 	log.Errorf("failed to create push req %v", err)
+			// }
+			// try server push.
+			// for i := 0; i < 3; i++ {
+			// 	if _, err := w.Write([]byte(fmt.Sprintf("response-%v", i))); err != nil {
+			// 		log.Errorf("failed to write %v", err)
+			// 		return
+			// 	}
+			// 	time.Sleep(time.Second * 3)
+			// }
 		})}
 
 	// Start the server with TLS, since we are running HTTP/2 it must be
