@@ -61,6 +61,16 @@ source setup.sh; docker-build
 source setup.sh; deploy
 ```
 
+## Aggregation Layer
+
+1. long duration req is possible
+1. streaming is possible (curl -N option)
+1. using customized path to be k8s-noic
+
+```shell
+source setup.sh && apiserver-foo
+ ```
+
 
 ## Notes
 

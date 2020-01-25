@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	// "time"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	ts "istio.io/istio/pilot/pkg/troubleshooting"
@@ -42,28 +44,21 @@ func startAPIService() {
 		func(w http.ResponseWriter, r *http.Request) {
 			// Log the request protocol
 			log.Infof("Got connection: %s, path %v", r.Proto, r.URL.Path)
-			// if r.URL.Path == "/push-test" {
-			// 	w.Write([]byte("push response"))
-			// 	return
-			// }
 			// Send a message back to the client
+			w.Write([]byte("send some simple response first..."))
+			flusher, _ := w.(http.Flusher)
+			flusher.Flush()
+			if strings.Contains(r.URL.Path, "foo") {
+				duration := "8"
+				_, ok := r.URL.Query()["sleep"]
+				if ok {
+					duration = r.URL.Query()["sleep"][0]
+				}
+				log.Infof("path contains foo, sleeping %v seconds", duration)
+				s, _ := strconv.Atoi(duration)
+				time.Sleep(time.Duration(s) * time.Second)
+			}
 			w.Write([]byte("Hello"))
-			// pusher, ok := w.(http.Pusher)
-			// if !ok {
-			// 	log.Errorf("failed to do push")
-			// }
-			// ErrNotSupported, feature not supported error.
-			// if err := pusher.Push("/push-test", nil); err != nil {
-			// 	log.Errorf("failed to create push req %v", err)
-			// }
-			// try server push.
-			// for i := 0; i < 3; i++ {
-			// 	if _, err := w.Write([]byte(fmt.Sprintf("response-%v", i))); err != nil {
-			// 		log.Errorf("failed to write %v", err)
-			// 		return
-			// 	}
-			// 	time.Sleep(time.Second * 3)
-			// }
 		})}
 
 	// Start the server with TLS, since we are running HTTP/2 it must be

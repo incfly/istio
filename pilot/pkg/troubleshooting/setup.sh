@@ -21,6 +21,17 @@ docker-build() {
   popd
 }
 
+# https://kubernetes.io/docs/tasks/administer-cluster/access-cluster-api/#without-kubectl-proxy
+# one off setup isntructions.
+# kubectl create sa echo-sa
+# kubectl create clusterrolebinding cluster-admin-binding-echosa  --clusterrole=cluster-admin --user=system:serviceaccount:default:echo-sa
+apiserver-foo() {
+  export CLUSTER_NAME="gke_jianfeih-test_us-central1-a_istio-dev"
+  TOKEN=$(kubectl get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='echo-sa')].data.token}"|base64 --decode)
+  APISERVER=$(kubectl config view -o jsonpath="{.clusters[?(@.name==\"$CLUSTER_NAME\")].cluster.server}")
+  curl -X GET "$APISERVER/apis/echo.example.com/v1alpha1/foo/bar?sleep=20" --header "Authorization: Bearer $TOKEN" --insecure   -N
+}
+
 deploy() {
   krmpo -nistio-system -lapp=ts-server
   krmpo -lapp=httpbin
@@ -45,27 +56,6 @@ genhttp2cert() {
 }
 
 
-# out of order execution
-# starting with 1
-# 2019-12-30T20:21:39.999175Z	info	respose is {response-proxy1-cli-req-5 {} [] 0}
-# starting with 10
-# 2019-12-30T20:21:40.425842Z	info	respose is {response-proxy1-cli-req-3 {} [] 0}
-# starting with 2
-# 2019-12-30T20:21:42.044724Z	info	respose is {response-proxy1-cli-req-6 {} [] 0}
-# starting with 3
-# 2019-12-30T20:21:39.142941Z	info	respose is {response-proxy1-cli-req-8 {} [] 0}
-# starting with 4
-# 2019-12-30T20:21:40.268722Z	info	respose is {response-proxy1-cli-req-9 {} [] 0}
-# starting with 5
-# 2019-12-30T20:21:39.286300Z	info	respose is {response-proxy1-cli-req-10 {} [] 0}
-# starting with 6
-# 2019-12-30T20:21:40.392495Z	info	respose is {response-proxy1-cli-req-2 {} [] 0}
-# starting with 7
-# 2019-12-30T20:21:42.969102Z	info	respose is {response-proxy1-cli-req-4 {} [] 0}
-# starting with 8
-# 2019-12-30T20:21:39.067125Z	info	respose is {response-proxy1-cli-req-7 {} [] 0}
-# starting with 9
-# 2019-12-30T20:21:39.366402Z	info	respose is {response-proxy1-cli-req-1 {} [] 0}
 multiclient() {
   rm -rf output/ && mkdir output/
   for i in `seq 1 5`; do
