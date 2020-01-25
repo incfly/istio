@@ -72,10 +72,6 @@ const (
 	// IstioIngressLabelValue is value for IstioLabel that identifies an ingress workload.
 	IstioIngressLabelValue = "ingress"
 
-	// IstioAPIGroupDomain defines API group domain of all Istio configuration resources.
-	// Group domain suffix to the proto schema's group to generate the full resource group.
-	IstioAPIGroupDomain = ".istio.io"
-
 	// IstioSystemNamespace is the namespace where Istio's components are deployed
 	IstioSystemNamespace = "istio-system"
 
@@ -89,4 +85,7 @@ const (
 
 	// IstioMeshGateway is the built in gateway for all sidecars
 	IstioMeshGateway = "mesh"
+
+	// The data name in the ConfigMap of each namespace storing the root cert of non-Kube CA.
+	CACertNamespaceConfigMapDataName = "ca-cert-ns.pem"
 )

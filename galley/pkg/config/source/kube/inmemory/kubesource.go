@@ -28,12 +28,13 @@ import (
 	"github.com/hashicorp/go-multierror"
 	kubeJson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 
-	"istio.io/istio/galley/pkg/config/event"
-	"istio.io/istio/galley/pkg/config/resource"
-	"istio.io/istio/galley/pkg/config/schema/collection"
 	"istio.io/istio/galley/pkg/config/scope"
 	"istio.io/istio/galley/pkg/config/source/inmemory"
 	"istio.io/istio/galley/pkg/config/source/kube/rt"
+	"istio.io/istio/pkg/config/event"
+	"istio.io/istio/pkg/config/resource"
+	"istio.io/istio/pkg/config/schema/collection"
+	schemaresource "istio.io/istio/pkg/config/schema/resource"
 )
 
 var inMemoryKubeNameDiscriminator int64
@@ -245,7 +246,7 @@ func (s *KubeSource) parseChunk(r *collection.Schemas, yamlChunk []byte) (kubeRe
 		return kubeResource{}, fmt.Errorf("failed interpreting jsonChunk: %v", err)
 	}
 
-	schema, found := r.FindByGroupAndKind(groupVersionKind.Group, groupVersionKind.Kind)
+	schema, found := r.FindByGroupVersionKind(schemaresource.FromKubernetesGVK(groupVersionKind))
 	if !found {
 		return kubeResource{}, fmt.Errorf("failed finding schema for group/kind: %s/%s", groupVersionKind.Group, groupVersionKind.Kind)
 	}

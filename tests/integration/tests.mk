@@ -130,7 +130,7 @@ test.integration.%.local: | $(JUNIT_REPORT)
 # Generate presubmit integration test targets for each component in kubernetes environment
 test.integration.%.kube.presubmit: istioctl | $(JUNIT_REPORT)
 	PATH=${PATH}:${ISTIO_OUT} $(GO) test -p 1 ${T} ./tests/integration/$(subst .,/,$*)/... ${_INTEGRATION_TEST_WORKDIR_FLAG} ${_INTEGRATION_TEST_CIMODE_FLAG} -timeout 30m \
-    --istio.test.select -postsubmit,-flaky \
+	--istio.test.select -postsubmit,-flaky \
 	--istio.test.env kube \
 	--istio.test.kube.config ${INTEGRATION_TEST_KUBECONFIG} \
 	--istio.test.hub=${HUB} \
@@ -193,4 +193,18 @@ test.integration.kube.presubmit: istioctl | $(JUNIT_REPORT)
 test.integration.race.native: | $(JUNIT_REPORT)
 	$(GO) test -race -p 1 ${T} ${TEST_PACKAGES} -timeout 120m \
 	--istio.test.env native \
+	2>&1 | tee >($(JUNIT_REPORT) > $(JUNIT_OUT))
+
+# Defines a target to run a minimal reachability testing basic traffic
+.PHONY: test.integration.kube.reachability
+test.integration.kube.reachability: istioctl | $(JUNIT_REPORT)
+	PATH=${PATH}:${ISTIO_OUT} $(GO) test -p 1 ${T} ./tests/integration/security/ ${_INTEGRATION_TEST_WORK_DIR_FLAG} ${_INTEGRATION_TEST_CIMODE_FLAG} -timeout 30m \
+	--istio.test.env kube \
+	--istio.test.kube.config ${INTEGRATION_TEST_KUBECONFIG} \
+	--istio.test.hub=${HUB} \
+	--istio.test.tag=${TAG} \
+	--test.run=TestReachability \
+	--istio.test.pullpolicy=${_INTEGRATION_TEST_PULL_POLICY} \
+	${_INTEGRATION_TEST_INGRESS_FLAG} \
+	${_INTEGRATION_TEST_INSTALL_TYPE} \
 	2>&1 | tee >($(JUNIT_REPORT) > $(JUNIT_OUT))

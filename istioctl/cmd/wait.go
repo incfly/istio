@@ -28,12 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
-	"istio.io/istio/galley/pkg/config/schema/collection"
-	"istio.io/istio/galley/pkg/config/schema/collections"
 	"istio.io/istio/istioctl/pkg/kubernetes"
 	"istio.io/istio/istioctl/pkg/util/handlers"
 	"istio.io/istio/pilot/pkg/model"
 	v2 "istio.io/istio/pilot/pkg/proxy/envoy/v2"
+	"istio.io/istio/pkg/config/schema/collection"
+	"istio.io/istio/pkg/config/schema/collections"
 )
 
 var (
@@ -155,7 +155,7 @@ func validateType(kind string) error {
 	// Remove any dashes.
 	kind = strings.ReplaceAll(kind, "-", "")
 
-	for _, s := range collections.Istio.All() {
+	for _, s := range collections.Pilot.All() {
 		if strings.EqualFold(kind, s.Resource().Kind()) {
 			targetSchema = s
 			return nil

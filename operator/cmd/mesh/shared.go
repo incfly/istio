@@ -19,8 +19,11 @@ package mesh
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"strings"
 
+	"istio.io/istio/operator/pkg/util"
 	"istio.io/pkg/log"
 )
 
@@ -35,8 +38,6 @@ func configLogs(logToStdErr bool) error {
 	opt := log.DefaultOptions()
 	if logToStdErr {
 		opt.OutputPaths = []string{"stderr"}
-	} else {
-		opt.SetOutputLevel(log.OverrideScopeName, log.NoneLevel)
 	}
 	return log.Configure(opt)
 }
@@ -121,4 +122,19 @@ func (l *Logger) printErr(s string) {
 
 func refreshGoldenFiles() bool {
 	return os.Getenv("UPDATE_GOLDENS") == "true"
+}
+
+func ReadLayeredYAMLs(filenames []string) (string, error) {
+	var ly string
+	for _, fn := range filenames {
+		b, err := ioutil.ReadFile(strings.TrimSpace(fn))
+		if err != nil {
+			return "", err
+		}
+		ly, err = util.OverlayYAML(ly, string(b))
+		if err != nil {
+			return "", err
+		}
+	}
+	return ly, nil
 }

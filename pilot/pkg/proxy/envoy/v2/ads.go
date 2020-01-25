@@ -33,6 +33,7 @@ import (
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/util"
 	"istio.io/istio/pilot/pkg/util/sets"
+	"istio.io/istio/pkg/config/schema/resource"
 )
 
 var (
@@ -116,7 +117,7 @@ type XdsEvent struct {
 
 	namespacesUpdated map[string]struct{}
 
-	configTypesUpdated map[string]struct{}
+	configTypesUpdated map[resource.GroupVersionKind]struct{}
 
 	// Push context to use for the push.
 	push *model.PushContext
@@ -591,15 +592,20 @@ func (s *DiscoveryServer) ProxyUpdate(clusterID, ip string) {
 	}
 
 	s.pushQueue.Enqueue(connection, &model.PushRequest{
-		Full:  true,
-		Push:  s.globalPushContext(),
-		Start: time.Now(),
+		Full:   true,
+		Push:   s.globalPushContext(),
+		Start:  time.Now(),
+		Reason: []model.TriggerReason{model.ProxyUpdate},
 	})
 }
 
 // AdsPushAll will send updates to all nodes, for a full config or incremental EDS.
 func AdsPushAll(s *DiscoveryServer) {
-	s.AdsPushAll(versionInfo(), &model.PushRequest{Full: true, Push: s.globalPushContext()})
+	s.AdsPushAll(versionInfo(), &model.PushRequest{
+		Full:   true,
+		Push:   s.globalPushContext(),
+		Reason: []model.TriggerReason{model.DebugTrigger},
+	})
 }
 
 // AdsPushAll implements old style invalidation, generated when any rule or endpoint changes.

@@ -4,8 +4,8 @@
 package basicmeta
 
 import (
-	"istio.io/istio/galley/pkg/config/schema/collection"
-	"istio.io/istio/galley/pkg/config/schema/resource"
+	"istio.io/istio/pkg/config/schema/collection"
+	"istio.io/istio/pkg/config/schema/resource"
 	"istio.io/istio/pkg/config/validation"
 )
 
@@ -58,5 +58,9 @@ var (
 	// Kube contains only kubernetes collections.
 	Kube = collection.NewSchemasBuilder().
 		MustAdd(K8SCollection1).
+		Build()
+
+	// Pilot contains only collections used by Pilot.
+	Pilot = collection.NewSchemasBuilder().
 		Build()
 )

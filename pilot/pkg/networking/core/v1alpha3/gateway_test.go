@@ -32,7 +32,8 @@ import (
 	"istio.io/istio/pilot/pkg/security/model"
 	"istio.io/istio/pkg/config/constants"
 	"istio.io/istio/pkg/config/mesh"
-	"istio.io/istio/pkg/config/schemas"
+	"istio.io/istio/pkg/config/schema/collections"
+	"istio.io/istio/pkg/config/schema/resource"
 	"istio.io/istio/pkg/proto"
 )
 
@@ -848,7 +849,7 @@ func TestGatewayHTTPRouteConfig(t *testing.T) {
 	}
 	virtualService := pilot_model.Config{
 		ConfigMeta: pilot_model.ConfigMeta{
-			Type:      schemas.VirtualService.Type,
+			Type:      collections.IstioNetworkingV1Alpha3Virtualservices.Resource().Kind(),
 			Name:      "virtual-service",
 			Namespace: "default",
 		},
@@ -856,7 +857,7 @@ func TestGatewayHTTPRouteConfig(t *testing.T) {
 	}
 	virtualServiceCopy := pilot_model.Config{
 		ConfigMeta: pilot_model.ConfigMeta{
-			Type:      schemas.VirtualService.Type,
+			Type:      collections.IstioNetworkingV1Alpha3Virtualservices.Resource().Kind(),
 			Name:      "virtual-service-copy",
 			Namespace: "default",
 		},
@@ -864,7 +865,7 @@ func TestGatewayHTTPRouteConfig(t *testing.T) {
 	}
 	virtualServiceWildcard := pilot_model.Config{
 		ConfigMeta: pilot_model.ConfigMeta{
-			Type:      schemas.VirtualService.Type,
+			Type:      collections.IstioNetworkingV1Alpha3Virtualservices.Resource().Kind(),
 			Name:      "virtual-service-wildcard",
 			Namespace: "default",
 		},
@@ -950,14 +951,15 @@ func buildEnv(t *testing.T, gateways []pilot_model.Config, virtualServices []pil
 
 	configStore := &fakes.IstioConfigStore{}
 	configStore.GatewaysReturns(gateways)
-	configStore.ListStub = func(typ, namespace string) (configs []pilot_model.Config, e error) {
-		if typ == "virtual-service" {
+	configStore.ListStub = func(kind resource.GroupVersionKind, namespace string) (configs []pilot_model.Config, e error) {
+		switch kind {
+		case collections.IstioNetworkingV1Alpha3Virtualservices.Resource().GroupVersionKind():
 			return virtualServices, nil
-		}
-		if typ == "gateway" {
+		case collections.IstioNetworkingV1Alpha3Gateways.Resource().GroupVersionKind():
 			return gateways, nil
+		default:
+			return nil, nil
 		}
-		return nil, nil
 	}
 	m := mesh.DefaultMeshConfig()
 	env := pilot_model.Environment{
