@@ -53,6 +53,7 @@ func startAPIService() {
 			// X-Forwarded-Uri:[/apis/echo.example.com/v1alpha1/foo/bar]
 			// X-Remote-Group:[system:serviceaccounts system:serviceaccounts:default system:authenticated]
 			// X-Remote-User:[system:serviceaccount:default:echo-sa]]
+			// Saw many other fluentd, kubesystem, controller level user request. controller-manager. resource-quota-controller.
 			log.Infof("Request header (check authn user req): %v", r.Header)
 			// Send a message back to the client
 			w.Write([]byte("send some simple response first..."))
