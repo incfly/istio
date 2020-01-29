@@ -44,6 +44,16 @@ func startAPIService() {
 		func(w http.ResponseWriter, r *http.Request) {
 			// Log the request protocol
 			log.Infof("Got connection: %s, path %v", r.Proto, r.URL.Path)
+
+			// This gives following output.
+			// 2020-01-29T09:51:11.692190Z     info    Request header (check authn user req):
+			// map[Accept:[*/*] Accept-Encoding:[gzip] User-Agent:[curl/7.66.0] X-Forwarded-For:[203.208.61.208]
+			// X-Forwarded-Host:[10.40.3.79:9000]
+			// X-Forwarded-Proto:[https]
+			// X-Forwarded-Uri:[/apis/echo.example.com/v1alpha1/foo/bar]
+			// X-Remote-Group:[system:serviceaccounts system:serviceaccounts:default system:authenticated]
+			// X-Remote-User:[system:serviceaccount:default:echo-sa]]
+			log.Infof("Request header (check authn user req): %v", r.Header)
 			// Send a message back to the client
 			w.Write([]byte("send some simple response first..."))
 			flusher, _ := w.(http.Flusher)

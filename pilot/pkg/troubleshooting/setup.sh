@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export TAG="0108a" HUB="gcr.io/jianfeih-test"
+
 proto() {
   protoc --go_out=plugins=grpc:. api/service.proto
 }
@@ -8,15 +10,18 @@ proto() {
 #   go build -o ts-server 
 # }
 
-docker-build() {
+docker-build-server() {
   pushd cmd/server
   go build -o ts-server main.go
-  docker build . -t gcr.io/jianfeih-test/ts-server:0108a
-  docker push gcr.io/jianfeih-test/ts-server:0108a
+  docker build . -t "gcr.io/jianfeih-test/ts-server:${TAG}"
+  docker push "gcr.io/jianfeih-test/ts-server:${TAG}"
   popd
+}
+
+docker-build() {
+  docker-build-server
 
   pushd "${GOPATH}/src/istio.io/istio"
-  export TAG="0108a" HUB="gcr.io/jianfeih-test"
   make docker.proxyv2 && docker push "gcr.io/jianfeih-test/proxyv2:${TAG}"
   popd
 }
@@ -28,6 +33,7 @@ docker-build() {
 apiserver-foo() {
   export CLUSTER_NAME="gke_jianfeih-test_us-central1-a_istio-dev"
   TOKEN=$(kubectl get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='echo-sa')].data.token}"|base64 --decode)
+  echo "Obtained token... ${TOKEN}"
   APISERVER=$(kubectl config view -o jsonpath="{.clusters[?(@.name==\"$CLUSTER_NAME\")].cluster.server}")
   curl -X GET "$APISERVER/apis/echo.example.com/v1alpha1/foo/bar?sleep=20" --header "Authorization: Bearer $TOKEN" --insecure   -N
 }
