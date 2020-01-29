@@ -1,0 +1,13 @@
+{
+  "apiVersion": "authorization.k8s.io/v1beta1",
+  "kind": "SubjectAccessReview",
+  "spec": {
+    "resourceAttributes": {
+      "namespace": "default",
+      "verb": "GET",
+      "group": "*",
+      "resource": "pods"
+    },
+    "user": "system:serviceaccount:default:echo-sa"
+  }
+}

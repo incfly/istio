@@ -26,6 +26,7 @@ docker-build() {
   popd
 }
 
+
 # https://kubernetes.io/docs/tasks/administer-cluster/access-cluster-api/#without-kubectl-proxy
 # one off setup isntructions.
 # kubectl create sa echo-sa
@@ -36,6 +37,38 @@ apiserver-foo() {
   echo "Obtained token... ${TOKEN}"
   APISERVER=$(kubectl config view -o jsonpath="{.clusters[?(@.name==\"$CLUSTER_NAME\")].cluster.server}")
   curl -X GET "$APISERVER/apis/echo.example.com/v1alpha1/foo/bar?sleep=20" --header "Authorization: Bearer $TOKEN" --insecure   -N
+}
+
+# {
+#   "kind": "SubjectAccessReview",
+#   "apiVersion": "authorization.k8s.io/v1beta1",
+#   "metadata": {
+#     "creationTimestamp": null
+#   },
+#   "spec": {
+#     "resourceAttributes": {
+#       "namespace": "default",
+#       "verb": "GET",
+#       "group": "*",
+#       "resource": "pods"
+#     },
+#     "user": "system:serviceaccount:default:echo-sa"
+#   },
+#   "status": {
+#     "allowed": true,
+#     "reason": "RBAC: allowed by ClusterRoleBinding \"cluster-admin-binding-echosa\" of ClusterRole \"cluster-admin\" to User \"system:serviceaccount:default:echo-sa\""
+#   }
+# }
+apiserver-authz() {
+  # reference
+  # https://docs.openshift.com/aro/rest_api/apis-authorization.k8s.io/v1beta1.SubjectAccessReview.html
+  curl -k \
+    -X POST \
+    -d @authz.json \
+    -H "Authorization: Bearer $TOKEN" \
+    -H 'Accept: application/json' \
+    -H 'Content-Type: application/json' \
+    "${APISERVER}/apis/authorization.k8s.io/v1beta1/subjectaccessreviews"
 }
 
 deploy() {
