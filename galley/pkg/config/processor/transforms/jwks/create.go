@@ -32,7 +32,6 @@ var (
 
 // GetProviders returns transformer providers for auth policy transformers
 func GetProviders() transformer.Providers {
-	scope.Processing.Infof("incfly/create.go invoked")
 	return []transformer.Provider{
 		transformer.NewSimpleTransformerProvider(
 			collections.K8SSecurityIstioIoV1Beta1Requestauthentications,          // k8s version schema
@@ -47,6 +46,11 @@ func handler(destination collection.Schema) func(e event.Event, h event.Handler)
 		scope.Processing.Infof("incfly/jwks/transformer invoked, event %v", e)
 		if e.Resource.Metadata.FullName.Namespace == "asm-jwks-internal-event" {
 			scope.Processing.Infof("incfly/jwks internal asm jws event")
+			// TODO: workaround using ADD && DELETE AGAIN does not work.
+			// ne := e.Clone()
+			// ne.Kind = event.Deleted
+			// scope.Processing.Infof("incfly/jwks internal asm jws event, deleting it, before %v, after %v", e, ne)
+			// h.Handle(ne)
 			return
 		}
 		e = e.WithSource(destination)

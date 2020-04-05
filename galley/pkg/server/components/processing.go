@@ -72,7 +72,7 @@ func (js *JwksEventSource) Dispatch(handler event.Handler) {
 
 func (js *JwksEventSource) Start() {
 	scope.Infof("incfly/processing.go jwksevent started...")
-	ticker := time.NewTicker(20 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	done := make(chan bool)
 	go func() {
 		for {
@@ -80,17 +80,17 @@ func (js *JwksEventSource) Start() {
 			case <-done:
 				return
 			case <-ticker.C:
-				suffix := rand.Int31n(100)
+				suffix := rand.Int31n(4)
 				scope.Infof("incfly/processing.go, gen event, %v", suffix)
 				js.handlers.Handle(event.Event{
-					Kind:   event.Updated,
+					Kind:   event.Deleted,
 					Source: collections.K8SSecurityIstioIoV1Beta1Requestauthentications,
 					Resource: &resource.Instance{
 						Metadata: resource.Metadata{
 							Schema: collections.K8SSecurityIstioIoV1Beta1Requestauthentications.Resource(),
 							FullName: resource.FullName{
 								Namespace: resource.Namespace("asm-jwks-internal-event"),
-								Name:      resource.LocalName(fmt.Sprintf("%v", suffix)),
+								Name:      resource.LocalName("internal"),
 							},
 						},
 						// Just to remove the complaining of serialization error logging, should not produce in the output.
@@ -98,6 +98,7 @@ func (js *JwksEventSource) Start() {
 							JwtRules: []*secv1.JWTRule{
 								&secv1.JWTRule{
 									Issuer: "asm-jwks-internal-issuer",
+									Jwks:   fmt.Sprintf("%v", suffix),
 								},
 							},
 						},
