@@ -31,6 +31,7 @@ func GetProviders(m *schema.Metadata) transformer.Providers {
 		to := cols.MustFind(v.String())
 
 		handleFn := func(e event.Event, h event.Handler) {
+			// scope.Processing.Infof("incfly/transform/direct invoked %v, from %v, to %v", e, from, to)
 			e = e.WithSource(to)
 			h.Handle(e)
 		}
