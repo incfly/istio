@@ -45,6 +45,10 @@ func GetProviders() transformer.Providers {
 func handler(destination collection.Schema) func(e event.Event, h event.Handler) {
 	return func(e event.Event, h event.Handler) {
 		scope.Processing.Infof("incfly/jwks/transformer invoked, event %v", e)
+		if e.Resource.Metadata.FullName.Namespace == "asm-jwks-internal-event" {
+			scope.Processing.Infof("incfly/jwks internal asm jws event")
+			return
+		}
 		e = e.WithSource(destination)
 		if e.Resource != nil && e.Resource.Message != nil {
 			policy, ok := e.Resource.Message.(*secv1.RequestAuthentication)
@@ -54,7 +58,6 @@ func handler(destination collection.Schema) func(e event.Event, h event.Handler)
 			}
 			policy.GetJwtRules()[0].Jwks = fmt.Sprintf("jwtver-%v", count)
 			count++
-			// scope.Processing.Infof("incfly/jwks/transformer policy %v", policy)
 		}
 
 		h.Handle(e)

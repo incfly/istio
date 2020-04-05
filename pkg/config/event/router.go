@@ -72,7 +72,8 @@ func (r *router) Handle(e Event) {
 	if found {
 		h.handler.Handle(e)
 	} else {
-		scope.Processing.Warna("Router.Handle: No handler for event, dropping: ", e)
+		scope.Processing.Warnf("Router.Handle: No handler for event, dropping: %v, source %v", e, e.SourceName())
+		scope.Processing.Warnf("incfly current routers list %v", r.routers)
 	}
 }
 

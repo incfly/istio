@@ -16,6 +16,7 @@ package components
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"strings"
 	"sync"
@@ -32,6 +33,7 @@ import (
 	"istio.io/pkg/log"
 	"istio.io/pkg/version"
 
+	secv1 "istio.io/api/security/v1beta1"
 	"istio.io/istio/galley/pkg/config/analysis/analyzers"
 	"istio.io/istio/galley/pkg/config/processing"
 	"istio.io/istio/galley/pkg/config/processing/snapshotter"
@@ -46,8 +48,10 @@ import (
 	"istio.io/istio/galley/pkg/server/process"
 	"istio.io/istio/galley/pkg/server/settings"
 	"istio.io/istio/pkg/config/event"
+	"istio.io/istio/pkg/config/resource"
 	"istio.io/istio/pkg/config/schema"
 	"istio.io/istio/pkg/config/schema/collection"
+	"istio.io/istio/pkg/config/schema/collections"
 	"istio.io/istio/pkg/config/schema/snapshots"
 	configz "istio.io/istio/pkg/mcp/configz/server"
 	"istio.io/istio/pkg/mcp/creds"
@@ -57,6 +61,55 @@ import (
 	"istio.io/istio/pkg/mcp/snapshot"
 	"istio.io/istio/pkg/mcp/source"
 )
+
+type JwksEventSource struct {
+	handlers *event.Handlers
+}
+
+func (js *JwksEventSource) Dispatch(handler event.Handler) {
+	js.handlers.Add(handler)
+}
+
+func (js *JwksEventSource) Start() {
+	scope.Infof("incfly/processing.go jwksevent started...")
+	ticker := time.NewTicker(20 * time.Second)
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				suffix := rand.Int31n(100)
+				scope.Infof("incfly/processing.go, gen event, %v", suffix)
+				js.handlers.Handle(event.Event{
+					Kind:   event.Updated,
+					Source: collections.K8SSecurityIstioIoV1Beta1Requestauthentications,
+					Resource: &resource.Instance{
+						Metadata: resource.Metadata{
+							Schema: collections.K8SSecurityIstioIoV1Beta1Requestauthentications.Resource(),
+							FullName: resource.FullName{
+								Namespace: resource.Namespace("asm-jwks-internal-event"),
+								Name:      resource.LocalName(fmt.Sprintf("%v", suffix)),
+							},
+						},
+						// Just to remove the complaining of serialization error logging, should not produce in the output.
+						Message: &secv1.RequestAuthentication{
+							JwtRules: []*secv1.JWTRule{
+								&secv1.JWTRule{
+									Issuer: "asm-jwks-internal-issuer",
+								},
+							},
+						},
+					},
+				})
+			}
+		}
+	}()
+}
+
+func (js *JwksEventSource) Stop() {
+}
 
 const versionMetadataKey = "config.source.version"
 
@@ -134,10 +187,14 @@ func (p *Processing) Start() (err error) {
 		})
 	}
 
+	jwksSource := &JwksEventSource{
+		handlers: &event.Handlers{},
+	}
+
 	processorSettings := processor.Settings{
 		Metadata:           m,
 		DomainSuffix:       p.args.DomainSuffix,
-		Source:             event.CombineSources(mesh, src),
+		Source:             event.CombineSources(mesh, src, jwksSource),
 		TransformProviders: transformProviders,
 		Distributor:        distributor,
 		EnabledSnapshots:   p.args.Snapshots,
