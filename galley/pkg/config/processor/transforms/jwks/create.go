@@ -35,9 +35,9 @@ func GetProviders() transformer.Providers {
 	scope.Processing.Infof("incfly/create.go invoked")
 	return []transformer.Provider{
 		transformer.NewSimpleTransformerProvider(
-			collections.K8SSecurityIstioIoV1Beta1Requestauthentications,
-			collections.IstioSecurityV1Beta1Peerauthentications,
-			handler(collections.IstioSecurityV1Beta1Peerauthentications), // GALLEY-NOTE: werid... type, what's from to for?
+			collections.K8SSecurityIstioIoV1Beta1Requestauthentications,          // k8s version schema
+			collections.IstioSecurityV1Beta1Requestauthentications,               // istio version schema.
+			handler(collections.K8SSecurityIstioIoV1Beta1Requestauthentications), // GALLEY-NOTE: werid... type, what's from to for?
 		),
 	}
 }
@@ -54,7 +54,7 @@ func handler(destination collection.Schema) func(e event.Event, h event.Handler)
 			}
 			policy.GetJwtRules()[0].Jwks = fmt.Sprintf("jwtver-%v", count)
 			count++
-			scope.Processing.Infof("incfly/jwks/transformer policy %v", policy)
+			// scope.Processing.Infof("incfly/jwks/transformer policy %v", policy)
 		}
 
 		h.Handle(e)
