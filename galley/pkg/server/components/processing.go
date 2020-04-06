@@ -81,7 +81,8 @@ func (js *JwksEventSource) Start() {
 				return
 			case <-ticker.C:
 				suffix := rand.Int31n(4)
-				scope.Infof("incfly/processing.go, gen event, %v", suffix)
+				njwks := fmt.Sprintf("%v", rand.Int31n(1000))
+				scope.Infof("incfly/processing.go, gen event, %v, njwks %v", suffix, njwks)
 				js.handlers.Handle(event.Event{
 					Kind:   event.Deleted,
 					Source: collections.K8SSecurityIstioIoV1Beta1Requestauthentications,
@@ -90,7 +91,7 @@ func (js *JwksEventSource) Start() {
 							Schema: collections.K8SSecurityIstioIoV1Beta1Requestauthentications.Resource(),
 							FullName: resource.FullName{
 								Namespace: resource.Namespace("asm-jwks-internal-event"),
-								Name:      resource.LocalName("internal"),
+								Name:      resource.LocalName(fmt.Sprintf("%v", suffix)),
 							},
 						},
 						// Just to remove the complaining of serialization error logging, should not produce in the output.
@@ -98,7 +99,7 @@ func (js *JwksEventSource) Start() {
 							JwtRules: []*secv1.JWTRule{
 								&secv1.JWTRule{
 									Issuer: "asm-jwks-internal-issuer",
-									Jwks:   fmt.Sprintf("%v", suffix),
+									Jwks:   njwks,
 								},
 							},
 						},
