@@ -11,13 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+// Package jwks provides jwt public key transformation for request auethentication.
+// - start galley, `gupdate && gglog`
+// - port forwarding, kpfn istio-system $(kpidn istio-system -listio=galley) 9901
+// - run client:
+// go run galley/tools/mcpc/main.go
+//   --collections istio/security/v1beta1/requestauthentications  --output long  | grep 'issuer' -A 2`
 package jwks
 
 import (
-	"fmt"
-	"reflect"
-
 	secv1 "istio.io/api/security/v1beta1"
 	"istio.io/istio/galley/pkg/config/processing"
 	"istio.io/istio/galley/pkg/config/processing/transformer"
@@ -28,21 +30,6 @@ import (
 	"istio.io/istio/pkg/config/schema/collection"
 	"istio.io/istio/pkg/config/schema/collections"
 )
-
-var (
-	count = 1
-)
-
-// GetProviders returns transformer providers for auth policy transformers
-// func GetProviders() transformer.Providers {
-// 	return []transformer.Provider{
-// 		transformer.NewSimpleTransformerProvider(
-// 			collections.K8SSecurityIstioIoV1Beta1Requestauthentications,          // k8s version schema
-// 			collections.IstioSecurityV1Beta1Requestauthentications,               // istio version schema.
-// 			handler(collections.K8SSecurityIstioIoV1Beta1Requestauthentications), // GALLEY-NOTE: werid... type, what's from to for?
-// 		),
-// 	}
-// }
 
 func GetProviders() transformer.Providers {
 	inputs := collection.NewSchemasBuilder().
@@ -73,7 +60,6 @@ func GetProviders() transformer.Providers {
 
 // Start implements event.Transformer
 func (t *jwksTransformer) Start() {
-	scope.Processing.Infof("incfly jwks transformer started")
 }
 
 // Stop implements event.Transformer
@@ -110,17 +96,16 @@ func (t *jwksTransformer) updateJwksMap(policy *secv1.RequestAuthentication) {
 		jwks := rule.GetJwks()
 		t.jwksMap[iss] = jwks
 	}
-	scope.Processing.Infof("incfly/after updating, jwksmap %v", t.jwksMap)
 }
 
 // TODO: only the affecting working set is pushed, not persistent?
 // next working set, others fall back to original.
 // Handle implements event.Transformer
 func (t *jwksTransformer) Handle(e event.Event) {
-	scope.Processing.Infof("incfly transfomr handle event invoked %v", e)
 	if e.Resource != nil &&
 		e.Resource.Metadata.FullName.Namespace == "asm-jwks-internal-event" {
 		t.updateJwksMap(e.Resource.Message.(*secv1.RequestAuthentication))
+		// iterate all the policies.
 		for k, p := range t.policies {
 			msg := p.Message.(*secv1.RequestAuthentication)
 			updated := t.updateJwks(msg)
@@ -136,10 +121,8 @@ func (t *jwksTransformer) Handle(e event.Event) {
 		return
 	}
 
-	// update internal cache of the req authn map
 	switch e.Kind {
 	case event.Added, event.Updated:
-		// TODO(here): DO transform here!
 		updated := t.updateJwks(e.Resource.Message.(*secv1.RequestAuthentication))
 		scope.Processing.Infof("incfly/init add, updated %v", updated)
 		t.policies[e.Resource.Metadata.FullName.String()] = e.Resource
@@ -150,28 +133,7 @@ func (t *jwksTransformer) Handle(e event.Event) {
 	default:
 	}
 
-	// always doing nothing.
 	t.dispatch(e)
-	// switch e.Kind {
-	// case event.FullSync:
-	// 	t.dispatch(event.FullSyncFor(collections.IstioNetworkingV1Alpha3SyntheticServiceentries))
-	// 	return
-
-	// case event.Reset:
-	// 	t.dispatch(event.Event{Kind: event.Reset})
-	// 	return
-
-	// case event.Added, event.Updated, event.Deleted:
-	// 	// fallthrough
-
-	// default:
-	// 	panic(fmt.Errorf("transformer.Handle: Unexpected event received: %v", e))
-	// }
-
-	// switch e.Source.Name() {
-	// default:
-	// 	// panic(fmt.Errorf("received event with unexpected collection: %v", e.Source.Name()))
-	// }
 }
 
 func (t *jwksTransformer) dispatch(e event.Event) {
@@ -191,36 +153,9 @@ type jwksTransformer struct {
 
 // DispatchFor implements event.Transformer
 func (t *jwksTransformer) DispatchFor(c collection.Schema, h event.Handler) {
-	scope.Processing.Infof("incfly/jwks, DispatchFor handler %v, c %v", h, c)
+	// scope.Processing.Infof("incfly/jwks, DispatchFor handler %v, c %v", h, c)
 	switch c.Name() {
 	case collections.IstioSecurityV1Beta1Requestauthentications.Name():
 		t.handler = event.CombineHandlers(t.handler, h)
-	}
-}
-
-func handler(destination collection.Schema) func(e event.Event, h event.Handler) {
-	return func(e event.Event, h event.Handler) {
-		scope.Processing.Infof("incfly/jwks/transformer invoked, event %v", e)
-		if e.Resource.Metadata.FullName.Namespace == "asm-jwks-internal-event" {
-			scope.Processing.Infof("incfly/jwks internal asm jws event")
-			// TODO: workaround using ADD && DELETE AGAIN does not work.
-			// ne := e.Clone()
-			// ne.Kind = event.Deleted
-			// scope.Processing.Infof("incfly/jwks internal asm jws event, deleting it, before %v, after %v", e, ne)
-			// h.Handle(ne)
-			return
-		}
-		e = e.WithSource(destination)
-		if e.Resource != nil && e.Resource.Message != nil {
-			policy, ok := e.Resource.Message.(*secv1.RequestAuthentication)
-			if !ok {
-				scope.Processing.Errorf("unexpected proto found when converting authn.Policy: %v", reflect.TypeOf(e.Resource.Message))
-				return
-			}
-			policy.GetJwtRules()[0].Jwks = fmt.Sprintf("jwtver-%v", count)
-			count++
-		}
-
-		h.Handle(e)
 	}
 }
