@@ -17,7 +17,6 @@ package jwks
 import (
 	"fmt"
 	"reflect"
-	"strings"
 
 	secv1 "istio.io/api/security/v1beta1"
 	"istio.io/istio/galley/pkg/config/processing"
@@ -60,6 +59,13 @@ func GetProviders() transformer.Providers {
 			outputs:  outputs,
 			options:  o,
 			policies: map[string]*resource.Instance{},
+			jwksMap: map[string]string{
+				"1": "1",
+				"2": "2",
+				"3": "3",
+				"4": "4",
+				"5": "5",
+			},
 		}
 	}
 	return []xformer.Provider{transformer.NewProvider(inputs, outputs, createFn)}
@@ -84,6 +90,29 @@ func (t *jwksTransformer) Outputs() collection.Schemas {
 	return t.outputs
 }
 
+func (t *jwksTransformer) updateJwks(policy *secv1.RequestAuthentication) bool {
+	updated := false
+	for _, r := range policy.GetJwtRules() {
+		iss := r.GetIssuer()
+		jwks, ok := t.jwksMap[iss]
+		if !ok {
+			continue
+		}
+		r.Jwks = jwks
+		updated = true
+	}
+	return updated
+}
+
+func (t *jwksTransformer) updateJwksMap(policy *secv1.RequestAuthentication) {
+	for _, rule := range policy.GetJwtRules() {
+		iss := rule.GetIssuer()
+		jwks := rule.GetJwks()
+		t.jwksMap[iss] = jwks
+	}
+	scope.Processing.Infof("incfly/after updating, jwksmap %v", t.jwksMap)
+}
+
 // TODO: only the affecting working set is pushed, not persistent?
 // next working set, others fall back to original.
 // Handle implements event.Transformer
@@ -91,18 +120,10 @@ func (t *jwksTransformer) Handle(e event.Event) {
 	scope.Processing.Infof("incfly transfomr handle event invoked %v", e)
 	if e.Resource != nil &&
 		e.Resource.Metadata.FullName.Namespace == "asm-jwks-internal-event" {
-		workset := string(e.Resource.Metadata.FullName.Name)
-		njwks := e.Resource.Message.(*secv1.RequestAuthentication).GetJwtRules()[0].GetJwks()
+		t.updateJwksMap(e.Resource.Message.(*secv1.RequestAuthentication))
 		for k, p := range t.policies {
 			msg := p.Message.(*secv1.RequestAuthentication)
-			updated := false
-			for _, rule := range msg.GetJwtRules() {
-				if strings.Compare(rule.GetIssuer(), workset) < 0 {
-					scope.Processing.Infof("incfly-debug, issuer %v, workset %v", rule.GetIssuer(), workset)
-					rule.Jwks = "asm-updated-" + njwks
-					updated = true
-				}
-			}
+			updated := t.updateJwks(msg)
 			if updated {
 				scope.Processing.Infof("incfly/transform, perform update %v, policy %v", k, msg)
 				t.dispatch(event.Event{
@@ -119,6 +140,8 @@ func (t *jwksTransformer) Handle(e event.Event) {
 	switch e.Kind {
 	case event.Added, event.Updated:
 		// TODO(here): DO transform here!
+		updated := t.updateJwks(e.Resource.Message.(*secv1.RequestAuthentication))
+		scope.Processing.Infof("incfly/init add, updated %v", updated)
 		t.policies[e.Resource.Metadata.FullName.String()] = e.Resource
 	case event.Deleted:
 		delete(t.policies, e.Resource.Metadata.FullName.String())
@@ -163,6 +186,7 @@ type jwksTransformer struct {
 	options  processing.ProcessorOptions
 	handler  event.Handler
 	policies map[string]*resource.Instance
+	jwksMap  map[string]string
 }
 
 // DispatchFor implements event.Transformer
