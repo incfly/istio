@@ -8,7 +8,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	secv1 "istio.io/api/security/v1beta1"
 	"istio.io/istio/galley/pkg/config/processing"
-	"istio.io/istio/galley/pkg/config/scope"
 	"istio.io/istio/pkg/config/event"
 	"istio.io/istio/pkg/config/resource"
 	"istio.io/istio/pkg/config/schema/collections"
@@ -38,6 +37,10 @@ var (
 			JwtRules: []*secv1.JWTRule{
 				&secv1.JWTRule{
 					Issuer:  "b-iss",
+					JwksUri: "b-uri",
+				},
+				&secv1.JWTRule{
+					Issuer:  "b-iss-v2",
 					JwksUri: "b-uri",
 				},
 			},
@@ -109,7 +112,6 @@ type fakeHandler struct {
 }
 
 func (fh *fakeHandler) Handle(e event.Event) {
-	scope.Processing.Infof("incfly debug fake handler event %v", e)
 	fh.events = append(fh.events, &e)
 }
 
@@ -176,6 +178,39 @@ func TestJwksTransformer(t *testing.T) {
 									Issuer:  "a-iss",
 									JwksUri: "a-uri",
 									Jwks:    "a-pubkey-by-resolver",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "TransformMultiRules",
+			initial: transformState{
+				jwksMap: map[string]string{
+					"b-uri": "b-pubkey-by-resolver",
+				},
+			},
+			updates: jwksUpdate{
+				policyEvent: policyAddEvent(t, policyByName("b")),
+			},
+			want: []*event.Event{
+				&event.Event{
+					Kind:   event.Added,
+					Source: collections.IstioSecurityV1Beta1Requestauthentications,
+					Resource: &resource.Instance{
+						Message: &secv1.RequestAuthentication{
+							JwtRules: []*secv1.JWTRule{
+								&secv1.JWTRule{
+									Issuer:  "b-iss",
+									JwksUri: "b-uri",
+									Jwks:    "b-pubkey-by-resolver",
+								},
+								&secv1.JWTRule{
+									Issuer:  "b-iss-v2",
+									JwksUri: "b-uri",
+									Jwks:    "b-pubkey-by-resolver",
 								},
 							},
 						},
@@ -303,9 +338,6 @@ func TestJwksTransformer(t *testing.T) {
 					},
 				},
 			},
-		},
-		{
-			name: "PolicyDeletionAndJwksUpdate",
 		},
 	}
 	for _, tc := range testCases {

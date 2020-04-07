@@ -144,7 +144,7 @@ func (t *jwksTransformer) jwksUpdateHandler() error {
 				Resource: p,
 				Source:   collections.IstioSecurityV1Beta1Requestauthentications,
 			}
-			scope.Processing.Infof("incfly in transformer, update event is %v", e)
+			scope.Processing.Debugf("jwks transformer generating update event is %v", e)
 			t.dispatch(e)
 		}
 	}

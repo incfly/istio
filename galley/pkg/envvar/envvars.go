@@ -43,6 +43,10 @@ var (
 
 	// MCPSourceReqFreq is the frequency that is used by the rate limiter in MCP Sources
 	MCPSourceReqFreq = env.RegisterDurationVar("MCP_SOURCE_REQ_FREQ", time.Second, "")
+
+	// EnableJwksTransformer determines whether we enable jwks transformer.
+	EnableJwksTransformer = env.RegisterBoolVar(
+		"ENABLE_JWKS_TRANSFORMER", false, "if true, fill Request Authentication API Jwks if only JwksURI is provided.")
 )
 
 // RegisteredEnvVarNames returns the names of registered environment variables.

@@ -23,6 +23,7 @@ import (
 	"istio.io/istio/galley/pkg/config/processor/transforms/ingress"
 	"istio.io/istio/galley/pkg/config/processor/transforms/jwks"
 	"istio.io/istio/galley/pkg/config/processor/transforms/serviceentry"
+	"istio.io/istio/galley/pkg/envvar"
 	"istio.io/istio/pkg/config/schema"
 )
 
@@ -34,7 +35,8 @@ func Providers(m *schema.Metadata) transformer.Providers {
 	providers = append(providers, ingress.GetProviders()...)
 	providers = append(providers, direct.GetProviders(m)...)
 	providers = append(providers, authpolicy.GetProviders()...)
-	providers = append(providers, jwks.GetProviders()...)
-
+	if envvar.EnableJwksTransformer.Get() {
+		providers = append(providers, jwks.GetProviders()...)
+	}
 	return providers
 }
