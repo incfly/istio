@@ -121,7 +121,7 @@ func (t *jwksTransformer) Handle(e event.Event) {
 	switch e.Kind {
 	case event.Added, event.Updated:
 		updated := t.overridePolicy(e.Resource.Message.(*secv1.RequestAuthentication))
-		scope.Processing.Debugf("incfly/init add, updated %v", updated)
+		scope.Processing.Debugf("jwks transformer, policy %v transformed %v", e.Resource.Metadata.FullName, updated)
 		t.policies[e.Resource.Metadata.FullName.String()] = e.Resource
 	case event.Deleted:
 		delete(t.policies, e.Resource.Metadata.FullName.String())
@@ -139,11 +139,13 @@ func (t *jwksTransformer) jwksUpdateHandler() error {
 		msg := p.Message.(*secv1.RequestAuthentication)
 		updated := t.overridePolicy(msg)
 		if updated {
-			t.dispatch(event.Event{
+			e := event.Event{
 				Kind:     event.Updated,
 				Resource: p,
 				Source:   collections.IstioSecurityV1Beta1Requestauthentications,
-			})
+			}
+			scope.Processing.Infof("incfly in transformer, update event is %v", e)
+			t.dispatch(e)
 		}
 	}
 	return nil

@@ -6,9 +6,33 @@ import (
 	"github.com/google/go-cmp/cmp"
 	secv1 "istio.io/api/security/v1beta1"
 	"istio.io/istio/galley/pkg/config/processing"
+	"istio.io/istio/galley/pkg/config/scope"
 	"istio.io/istio/pkg/config/event"
 	"istio.io/istio/pkg/config/resource"
 	"istio.io/istio/pkg/config/schema/collections"
+)
+
+var (
+	// Issuer name capitalized means jwks already confiugred without requiring conversion, lower case
+	// means requiring.
+	policyRegistry = map[string]*secv1.RequestAuthentication{
+		"a": &secv1.RequestAuthentication{
+			JwtRules: []*secv1.JWTRule{
+				&secv1.JWTRule{
+					Issuer:  "a-iss",
+					JwksUri: "a-uri",
+				},
+			},
+		},
+		"A": &secv1.RequestAuthentication{
+			JwtRules: []*secv1.JWTRule{
+				&secv1.JWTRule{
+					Issuer: "a-iss",
+					Jwks:   "a-pubkey",
+				},
+			},
+		},
+	}
 )
 
 type fakeJwksresolver struct {
@@ -44,7 +68,7 @@ type jwksEntry struct {
 	jwks    string
 }
 
-type jwksUpdates struct {
+type jwksUpdate struct {
 	policyEvent *event.Event
 	jwksUpdate  *jwksEntry
 }
@@ -54,6 +78,7 @@ type fakeHandler struct {
 }
 
 func (fh *fakeHandler) Handle(e event.Event) {
+	scope.Processing.Infof("incfly debug fake handler event %v", e)
 	fh.events = append(fh.events, &e)
 }
 
@@ -65,54 +90,36 @@ func (fh *fakeHandler) validateEvents(t *testing.T, events []*event.Event) {
 }
 
 func TestJwksTransformer(t *testing.T) {
-	// Issuer name capitalized means jwks already confiugred without requiring conversion, lower case
-	// means requiring.
-	policies := map[string]*secv1.RequestAuthentication{
-		"a": &secv1.RequestAuthentication{
-			JwtRules: []*secv1.JWTRule{
-				&secv1.JWTRule{
-					Issuer:  "a-iss",
-					JwksUri: "a-uri",
-				},
-			},
-		},
-		"A": &secv1.RequestAuthentication{
-			JwtRules: []*secv1.JWTRule{
-				&secv1.JWTRule{
-					Issuer: "a-iss",
-					Jwks:   "a-pubkey",
-				},
-			},
-		},
-	}
 	testCases := []struct {
 		name string
 		// initial state of the transformer.
 		initial transformState
 		// updates is the changes we applied sequentially.
-		updates jwksUpdates
+		updates jwksUpdate
 		// want is expected events passed by the transformer.
 		want []*event.Event
 	}{
 		{
-			name: "basic",
+			name: "BasicTransform",
 			initial: transformState{
 				jwksMap: map[string]string{
 					"a-uri": "a-pubkey",
 				},
 			},
-			updates: jwksUpdates{
+			updates: jwksUpdate{
 				// Add single policy for "a".
 				policyEvent: &event.Event{
-					Kind: event.Added,
+					Kind:   event.Added,
+					Source: collections.IstioSecurityV1Beta1Requestauthentications,
 					Resource: &resource.Instance{
-						Message: policies["a"],
+						Message: policyRegistry["a"],
 					},
 				},
 			},
 			want: []*event.Event{
 				&event.Event{
-					Kind: event.Added,
+					Kind:   event.Added,
+					Source: collections.IstioSecurityV1Beta1Requestauthentications,
 					Resource: &resource.Instance{
 						Message: &secv1.RequestAuthentication{
 							JwtRules: []*secv1.JWTRule{
@@ -128,7 +135,23 @@ func TestJwksTransformer(t *testing.T) {
 			},
 		},
 		{
-			name: "",
+			name: "IgnoreResolverEmptyResponse",
+			// want: []*event.Event{},
+		},
+		{
+			name: "OriginalJwksRespectEvenUpdated",
+		},
+		{
+			name: "PolicyAddedTransform",
+		},
+		{
+			name: "JwksUpdate",
+		},
+		{
+			name: "JwksUpdateOnlyAffected",
+		},
+		{
+			name: "PolicyDeletionAndJwksUpdate",
 		},
 	}
 	for _, tc := range testCases {
@@ -143,7 +166,8 @@ func TestJwksTransformer(t *testing.T) {
 			xform := newJwksTransformer(res, processing.ProcessorOptions{})
 			for _, p := range c.initial.policies {
 				xform.Handle(event.Event{
-					Kind: event.Added,
+					Kind:   event.Added,
+					Source: collections.IstioSecurityV1Beta1Requestauthentications,
 					Resource: &resource.Instance{
 						Message: p,
 					},
