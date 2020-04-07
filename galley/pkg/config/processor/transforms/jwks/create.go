@@ -51,7 +51,6 @@ type jwksTransformer struct {
 	options  processing.ProcessorOptions
 	handler  event.Handler
 	policies map[string]*resource.Instance
-	// jwksMap  map[string]string
 	resolver JwksResolverHelper
 }
 type JwksUpdateHandler func() error
@@ -83,25 +82,25 @@ func newJwksTransformer(resolver JwksResolverHelper, opt processing.ProcessorOpt
 	return xform
 }
 
-// Start implements event.Transformer
+// Start implements event.Transformer.
 func (t *jwksTransformer) Start() {
 }
 
-// Stop implements event.Transformer
+// Stop implements event.Transformer.
 func (t *jwksTransformer) Stop() {
 }
 
-// Inputs implements event.Transformer
+// Inputs implements event.Transformer.
 func (t *jwksTransformer) Inputs() collection.Schemas {
 	return t.inputs
 }
 
-// Outputs implements event.Transformer
+// Outputs implements event.Transformer.
 func (t *jwksTransformer) Outputs() collection.Schemas {
 	return t.outputs
 }
 
-func (t *jwksTransformer) overridePolicy(policy *secv1.RequestAuthentication) bool {
+func (t *jwksTransformer) transform(policy *secv1.RequestAuthentication) bool {
 	updated := false
 	for _, r := range policy.GetJwtRules() {
 		uri := r.GetJwksUri()
@@ -110,7 +109,7 @@ func (t *jwksTransformer) overridePolicy(policy *secv1.RequestAuthentication) bo
 			r.Jwks = jwks
 			updated = true
 		} else {
-			scope.Processing.Errorf("jwks transforming resolver failed, empty jwks for jwks %v", uri)
+			scope.Processing.Errorf("jwks transformer resolver failed, empty jwks for jwks %v", uri)
 		}
 	}
 	return updated
@@ -120,8 +119,8 @@ func (t *jwksTransformer) overridePolicy(policy *secv1.RequestAuthentication) bo
 func (t *jwksTransformer) Handle(e event.Event) {
 	switch e.Kind {
 	case event.Added, event.Updated:
-		updated := t.overridePolicy(e.Resource.Message.(*secv1.RequestAuthentication))
-		scope.Processing.Debugf("jwks transformer, policy %v transformed %v", e.Resource.Metadata.FullName, updated)
+		updated := t.transform(e.Resource.Message.(*secv1.RequestAuthentication))
+		scope.Processing.Debugf("JWKS transformer, policy %v, transformed %v", e.Resource.Metadata.FullName, updated)
 		t.policies[e.Resource.Metadata.FullName.String()] = e.Resource
 	case event.Deleted:
 		delete(t.policies, e.Resource.Metadata.FullName.String())
@@ -137,14 +136,14 @@ func (t *jwksTransformer) jwksUpdateHandler() error {
 	// Iterate all the policies.
 	for _, p := range t.policies {
 		msg := p.Message.(*secv1.RequestAuthentication)
-		updated := t.overridePolicy(msg)
+		updated := t.transform(msg)
 		if updated {
 			e := event.Event{
 				Kind:     event.Updated,
 				Resource: p,
 				Source:   collections.IstioSecurityV1Beta1Requestauthentications,
 			}
-			scope.Processing.Debugf("jwks transformer generating update event is %v", e)
+			scope.Processing.Debugf("JWKS transformer generates update event: %v", e)
 			t.dispatch(e)
 		}
 	}

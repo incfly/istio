@@ -136,7 +136,7 @@ func (fh *fakeHandler) validateEvents(t *testing.T, events []*event.Event) {
 
 func policyAddEvent(t *testing.T, p *secv1.RequestAuthentication) *event.Event {
 	if p == nil {
-		t.Fatalf("unexpected ipnut nil policy")
+		t.Fatalf("unexpected input nil policy")
 	}
 	return &event.Event{
 		Kind:   event.Added,
