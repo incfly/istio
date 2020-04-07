@@ -41,21 +41,26 @@ func GetProviders() transformer.Providers {
 		Build()
 	createFn := func(o processing.ProcessorOptions) event.Transformer {
 		return newJwksTransformer(&fakeJwksresolver{}, o)
-		// return &jwksTransformer{
-		// 	inputs:   inputs,
-		// 	outputs:  outputs,
-		// 	options:  o,
-		// 	policies: map[string]*resource.Instance{},
-		// 	jwksMap: map[string]string{
-		// 		"1": "1",
-		// 		"2": "2",
-		// 		"3": "3",
-		// 		"4": "4",
-		// 		"5": "5",
-		// 	},
-		// }
 	}
 	return []xformer.Provider{transformer.NewProvider(inputs, outputs, createFn)}
+}
+
+type jwksTransformer struct {
+	inputs   collection.Schemas
+	outputs  collection.Schemas
+	options  processing.ProcessorOptions
+	handler  event.Handler
+	policies map[string]*resource.Instance
+	// jwksMap  map[string]string
+	resolver JwksResolverHelper
+}
+type JwksUpdateHandler func() error
+
+// JwksResolverHelper is a wrapper interface around actual jwks resolving implementation, intended used
+// by Galley transformer.
+type JwksResolverHelper interface {
+	SetUpdateFunc(fn JwksUpdateHandler)
+	ResolveJwks(jwksURI string) string
 }
 
 func newJwksTransformer(resolver JwksResolverHelper, opt processing.ProcessorOptions) *jwksTransformer {
@@ -67,20 +72,15 @@ func newJwksTransformer(resolver JwksResolverHelper, opt processing.ProcessorOpt
 		MustAdd(collections.IstioSecurityV1Beta1Requestauthentications).
 		Build()
 
-	return &jwksTransformer{
+	xform := &jwksTransformer{
 		inputs:   inputs,
 		outputs:  outputs,
 		options:  opt,
 		policies: map[string]*resource.Instance{},
 		resolver: resolver,
-		jwksMap: map[string]string{
-			"1": "1",
-			"2": "2",
-			"3": "3",
-			"4": "4",
-			"5": "5",
-		},
 	}
+	resolver.SetUpdateFunc(xform.jwksUpdateHandler)
+	return xform
 }
 
 // Start implements event.Transformer
@@ -101,51 +101,26 @@ func (t *jwksTransformer) Outputs() collection.Schemas {
 	return t.outputs
 }
 
-func (t *jwksTransformer) updateJwks(policy *secv1.RequestAuthentication) bool {
+func (t *jwksTransformer) overridePolicy(policy *secv1.RequestAuthentication) bool {
 	updated := false
 	for _, r := range policy.GetJwtRules() {
-		iss := r.GetIssuer()
-		jwks, ok := t.jwksMap[iss]
-		if !ok {
-			continue
+		uri := r.GetJwksUri()
+		jwks := t.resolver.ResolveJwks(uri)
+		if jwks != "" {
+			r.Jwks = jwks
+			updated = true
+		} else {
+			scope.Processing.Errorf("jwks transforming resolver failed, empty jwks for jwks %v", uri)
 		}
-		r.Jwks = jwks
-		updated = true
 	}
 	return updated
 }
 
-func (t *jwksTransformer) updateJwksMap(policy *secv1.RequestAuthentication) {
-	for _, rule := range policy.GetJwtRules() {
-		iss := rule.GetIssuer()
-		jwks := rule.GetJwks()
-		t.jwksMap[iss] = jwks
-	}
-}
-
 // Handle implements event.Transformer.
 func (t *jwksTransformer) Handle(e event.Event) {
-	if e.Resource != nil &&
-		e.Resource.Metadata.FullName.Namespace == "asm-jwks-internal-event" {
-		t.updateJwksMap(e.Resource.Message.(*secv1.RequestAuthentication))
-		// Iterate all the policies.
-		for _, p := range t.policies {
-			msg := p.Message.(*secv1.RequestAuthentication)
-			updated := t.updateJwks(msg)
-			if updated {
-				t.dispatch(event.Event{
-					Kind:     event.Updated,
-					Resource: p,
-					Source:   collections.IstioSecurityV1Beta1Requestauthentications,
-				})
-			}
-		}
-		return
-	}
-
 	switch e.Kind {
 	case event.Added, event.Updated:
-		updated := t.updateJwks(e.Resource.Message.(*secv1.RequestAuthentication))
+		updated := t.overridePolicy(e.Resource.Message.(*secv1.RequestAuthentication))
 		scope.Processing.Debugf("incfly/init add, updated %v", updated)
 		t.policies[e.Resource.Metadata.FullName.String()] = e.Resource
 	case event.Deleted:
@@ -154,8 +129,24 @@ func (t *jwksTransformer) Handle(e event.Event) {
 		t.policies = map[string]*resource.Instance{}
 	default:
 	}
-
 	t.dispatch(e)
+}
+
+// jwksUpdateHandler should be invoked by resolver when a jwks is updated.
+func (t *jwksTransformer) jwksUpdateHandler() error {
+	// Iterate all the policies.
+	for _, p := range t.policies {
+		msg := p.Message.(*secv1.RequestAuthentication)
+		updated := t.overridePolicy(msg)
+		if updated {
+			t.dispatch(event.Event{
+				Kind:     event.Updated,
+				Resource: p,
+				Source:   collections.IstioSecurityV1Beta1Requestauthentications,
+			})
+		}
+	}
+	return nil
 }
 
 func (t *jwksTransformer) dispatch(e event.Event) {
@@ -164,26 +155,8 @@ func (t *jwksTransformer) dispatch(e event.Event) {
 	}
 }
 
-type jwksTransformer struct {
-	inputs   collection.Schemas
-	outputs  collection.Schemas
-	options  processing.ProcessorOptions
-	handler  event.Handler
-	policies map[string]*resource.Instance
-	jwksMap  map[string]string
-	resolver JwksResolverHelper
-}
-
-// JwksResolverHelper is a wrapper interface around actual jwks resolving implementation, intended used
-// by Galley transformer.
-type JwksResolverHelper interface {
-	// SetUpdateFunc(fn func())
-	ResolveJwks(jwksURI string) string
-}
-
 // DispatchFor implements event.Transformer
 func (t *jwksTransformer) DispatchFor(c collection.Schema, h event.Handler) {
-	// scope.Processing.Infof("incfly/jwks, DispatchFor handler %v, c %v", h, c)
 	switch c.Name() {
 	case collections.IstioSecurityV1Beta1Requestauthentications.Name():
 		t.handler = event.CombineHandlers(t.handler, h)

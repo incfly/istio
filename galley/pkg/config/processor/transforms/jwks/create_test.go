@@ -13,14 +13,14 @@ import (
 
 type fakeJwksresolver struct {
 	jwksMap  map[string]string
-	updateFn func()
+	updateFn JwksUpdateHandler
 }
 
 func (r *fakeJwksresolver) ResolveJwks(jwksURI string) string {
 	return r.jwksMap[jwksURI]
 }
 
-func (r *fakeJwksresolver) SetUpdateFunc(fn func()) {
+func (r *fakeJwksresolver) SetUpdateFunc(fn JwksUpdateHandler) {
 	r.updateFn = fn
 }
 
@@ -34,7 +34,7 @@ func (r *fakeJwksresolver) update(jwksUri, jwks string) {
 	}
 }
 
-type jwksState struct {
+type transformState struct {
 	jwksMap  map[string]string
 	policies map[string]*secv1.RequestAuthentication
 }
@@ -64,9 +64,6 @@ func (fh *fakeHandler) validateEvents(t *testing.T, events []*event.Event) {
 	}
 }
 
-// state: jwks resolver, policies
-// operation, add/delete policies, jwks refresh happening.
-
 func TestJwksTransformer(t *testing.T) {
 	// Issuer name capitalized means jwks already confiugred without requiring conversion, lower case
 	// means requiring.
@@ -89,15 +86,17 @@ func TestJwksTransformer(t *testing.T) {
 		},
 	}
 	testCases := []struct {
-		name    string
-		initial jwksState
+		name string
+		// initial state of the transformer.
+		initial transformState
+		// updates is the changes we applied sequentially.
 		updates jwksUpdates
-		// The generated events passed by the transformer.
+		// want is expected events passed by the transformer.
 		want []*event.Event
 	}{
 		{
 			name: "basic",
-			initial: jwksState{
+			initial: transformState{
 				jwksMap: map[string]string{
 					"a-uri": "a-pubkey",
 				},
@@ -115,7 +114,15 @@ func TestJwksTransformer(t *testing.T) {
 				&event.Event{
 					Kind: event.Added,
 					Resource: &resource.Instance{
-						Message: policies["a"],
+						Message: &secv1.RequestAuthentication{
+							JwtRules: []*secv1.JWTRule{
+								&secv1.JWTRule{
+									Issuer:  "a-iss",
+									JwksUri: "a-uri",
+									Jwks:    "a-pubkey",
+								},
+							},
+						},
 					},
 				},
 			},
