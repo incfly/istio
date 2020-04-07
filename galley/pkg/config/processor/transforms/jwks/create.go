@@ -39,23 +39,48 @@ func GetProviders() transformer.Providers {
 	outputs := collection.NewSchemasBuilder().
 		MustAdd(collections.IstioSecurityV1Beta1Requestauthentications).
 		Build()
-
 	createFn := func(o processing.ProcessorOptions) event.Transformer {
-		return &jwksTransformer{
-			inputs:   inputs,
-			outputs:  outputs,
-			options:  o,
-			policies: map[string]*resource.Instance{},
-			jwksMap: map[string]string{
-				"1": "1",
-				"2": "2",
-				"3": "3",
-				"4": "4",
-				"5": "5",
-			},
-		}
+		return newJwksTransformer(&fakeJwksresolver{}, o)
+		// return &jwksTransformer{
+		// 	inputs:   inputs,
+		// 	outputs:  outputs,
+		// 	options:  o,
+		// 	policies: map[string]*resource.Instance{},
+		// 	jwksMap: map[string]string{
+		// 		"1": "1",
+		// 		"2": "2",
+		// 		"3": "3",
+		// 		"4": "4",
+		// 		"5": "5",
+		// 	},
+		// }
 	}
 	return []xformer.Provider{transformer.NewProvider(inputs, outputs, createFn)}
+}
+
+func newJwksTransformer(resolver JwksResolverHelper, opt processing.ProcessorOptions) *jwksTransformer {
+	inputs := collection.NewSchemasBuilder().
+		MustAdd(collections.K8SSecurityIstioIoV1Beta1Requestauthentications).
+		Build()
+
+	outputs := collection.NewSchemasBuilder().
+		MustAdd(collections.IstioSecurityV1Beta1Requestauthentications).
+		Build()
+
+	return &jwksTransformer{
+		inputs:   inputs,
+		outputs:  outputs,
+		options:  opt,
+		policies: map[string]*resource.Instance{},
+		resolver: resolver,
+		jwksMap: map[string]string{
+			"1": "1",
+			"2": "2",
+			"3": "3",
+			"4": "4",
+			"5": "5",
+		},
+	}
 }
 
 // Start implements event.Transformer
@@ -98,19 +123,16 @@ func (t *jwksTransformer) updateJwksMap(policy *secv1.RequestAuthentication) {
 	}
 }
 
-// TODO: only the affecting working set is pushed, not persistent?
-// next working set, others fall back to original.
-// Handle implements event.Transformer
+// Handle implements event.Transformer.
 func (t *jwksTransformer) Handle(e event.Event) {
 	if e.Resource != nil &&
 		e.Resource.Metadata.FullName.Namespace == "asm-jwks-internal-event" {
 		t.updateJwksMap(e.Resource.Message.(*secv1.RequestAuthentication))
-		// iterate all the policies.
-		for k, p := range t.policies {
+		// Iterate all the policies.
+		for _, p := range t.policies {
 			msg := p.Message.(*secv1.RequestAuthentication)
 			updated := t.updateJwks(msg)
 			if updated {
-				scope.Processing.Infof("incfly/transform, perform update %v, policy %v", k, msg)
 				t.dispatch(event.Event{
 					Kind:     event.Updated,
 					Resource: p,
@@ -124,7 +146,7 @@ func (t *jwksTransformer) Handle(e event.Event) {
 	switch e.Kind {
 	case event.Added, event.Updated:
 		updated := t.updateJwks(e.Resource.Message.(*secv1.RequestAuthentication))
-		scope.Processing.Infof("incfly/init add, updated %v", updated)
+		scope.Processing.Debugf("incfly/init add, updated %v", updated)
 		t.policies[e.Resource.Metadata.FullName.String()] = e.Resource
 	case event.Deleted:
 		delete(t.policies, e.Resource.Metadata.FullName.String())
@@ -149,6 +171,14 @@ type jwksTransformer struct {
 	handler  event.Handler
 	policies map[string]*resource.Instance
 	jwksMap  map[string]string
+	resolver JwksResolverHelper
+}
+
+// JwksResolverHelper is a wrapper interface around actual jwks resolving implementation, intended used
+// by Galley transformer.
+type JwksResolverHelper interface {
+	// SetUpdateFunc(fn func())
+	ResolveJwks(jwksURI string) string
 }
 
 // DispatchFor implements event.Transformer
