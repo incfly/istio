@@ -179,7 +179,128 @@
             "ads": {}
            }
        }
+      },
+      {
+        "name": "static_layer",
+        "static_layer": {
+          "envoy": {
+            "deprecated_features": {
+              "cluster": {
+                "proto:ORIGINAL_DST_LB": "true",
+                "proto:extension_protocol_options": "true",
+                "proto:tls_context": "true"
+              },
+              "health_check": {
+                "proto:use_http2": "true"
+              },
+              "http_connection_manager": {
+                "proto:operation_name": "true"
+              },
+              "listener": {
+                "proto:tls_context": "true"
+              },
+              "listener_components": {
+                "proto:config": "true"
+              },
+              "route_components": {
+                "proto:allow_origin": "true",
+                "proto:method": "true",
+                "proto:pattern": "true",
+                "proto:regex": "true",
+                "proto:regex_match": "true",
+                "proto:value": "true"
+              },
+              "string": {
+                "proto:regex": "true"
+              },
+              "trace": {
+                "proto:HTTP_JSON_V1": "true"
+              }
+            },
+            "deprecated_features:envoy": {
+              "api": {
+                "v2": {
+                  "Cluster": {
+                    "LbPolicy": {
+                      "ORIGINAL_DST_LB": "true"
+                    },
+                    "extension_protocol_options": "true",
+                    "tls_context": "true"
+                  },
+                  "Listener": {
+                    "tls_context": "true"
+                  },
+                  "core": {
+                    "HealthCheck": {
+                      "HttpHealthCheck": {
+                        "use_http2": "true"
+                      }
+                    }
+                  },
+                  "listener": {
+                    "Filter": {
+                      "config": "true"
+                    },
+                    "ListenerFilter": {
+                      "config": "true"
+                    }
+                  },
+                  "route": {
+                    "CorsPolicy": {
+                      "allow_origin": "true"
+                    },
+                    "HeaderMatcher": {
+                      "regex_match": "true"
+                    },
+                    "QueryParameterMatcher": {
+                      "regex": "true",
+                      "value": "true"
+                    },
+                    "RouteMatch": {
+                      "regex": "true"
+                    },
+                    "VirtualCluster": {
+                      "method": "true",
+                      "pattern": "true"
+                    }
+                  }
+                }
+              },
+              "config": {
+                "filter": {
+                  "network": {
+                    "http_connection_manager": {
+                      "v2": {
+                        "HttpConnectionManager": {
+                          "Tracing": {
+                            "operation_name": "true"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "trace": {
+                  "v2": {
+                    "ZipkinConfig": {
+                      "CollectorEndpointVersion": {
+                        "HTTP_JSON_V1": "true"
+                      }
+                    }
+                  }
+                }
+              },
+              "type": {
+                "matcher": {
+                  "StringMatcher": {
+                    "regex": "true"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
-     ]
+    ]
   }
 }
