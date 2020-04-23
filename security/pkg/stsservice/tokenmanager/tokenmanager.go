@@ -21,11 +21,17 @@ import (
 	"istio.io/istio/pkg/bootstrap/platform"
 	"istio.io/istio/security/pkg/stsservice"
 	"istio.io/istio/security/pkg/stsservice/tokenmanager/google"
+	"istio.io/pkg/env"
 )
 
 const (
 	// GoogleTokenExchange is the name of the google token exchange service.
 	GoogleTokenExchange = "GoogleTokenExchange"
+)
+
+var (
+	// GKEClusterURL is the GKE container URL used to construct the audience field in the token exchange request.
+	GKEClusterURL = env.RegisterStringVar("GKE_CLUSTER_URL", "", "The url of GKE cluster").Get()
 )
 
 // Plugin provides common interfaces for specific token exchange services.
@@ -82,6 +88,9 @@ func CreateTokenManager(tokenManagerType string, config Config) stsservice.Token
 		if projectInfo := getGCPProjectInfo(); len(projectInfo.Number) > 0 {
 			gkeClusterURL := fmt.Sprintf("https://container.googleapis.com/v1/projects/%s/locations/%s/clusters/%s",
 				projectInfo.id, projectInfo.clusterLocation, projectInfo.cluster)
+			if GKEClusterURL != "" {
+				gkeClusterURL = GKEClusterURL
+			}
 			if p, err := google.CreateTokenManagerPlugin(config.TrustDomain, projectInfo.Number, gkeClusterURL, true); err == nil {
 				tm.plugin = p
 			}
