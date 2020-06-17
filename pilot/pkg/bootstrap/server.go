@@ -608,8 +608,9 @@ func (s *Server) initSecureGrpcServer(port string, keepalive *istiokeepalive.Opt
 
 	cfg := &tls.Config{
 		Certificates: []tls.Certificate{certP},
-		ClientAuth:   tls.VerifyClientCertIfGiven,
-		ClientCAs:    cp,
+		// Note: this is a temporary fix before istiod is able to load CA certificate to authenticate clients.
+		ClientAuth: tls.NoClientCert,
+		ClientCAs:  cp,
 	}
 
 	tlsCreds := credentials.NewTLS(cfg)
