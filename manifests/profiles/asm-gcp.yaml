@@ -26,7 +26,10 @@ spec:
       k8s:
         resources:
           requests:
-            cpu: 2000m
+            cpu: 1000m
+        hpaSpec:
+          minReplicas: 2
+        replicaCount: 2
   addonComponents:
     # Grafana is disabled by default, but supported with --set values.grafana.enabled=true
     # This requires enabling prometheus.
