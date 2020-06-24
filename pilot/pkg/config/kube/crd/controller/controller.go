@@ -35,6 +35,7 @@ import (
 
 	"istio.io/istio/pilot/pkg/config/kube/crd"
 	"istio.io/istio/pilot/pkg/features"
+	"istio.io/istio/pilot/pkg/gcpmonitoring"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/serviceregistry/kube"
 	controller2 "istio.io/istio/pilot/pkg/serviceregistry/kube/controller"
@@ -271,6 +272,7 @@ func handleValidationFailure(obj interface{}, err error) {
 
 func incrementEvent(kind, event string) {
 	k8sEvents.With(typeTag.Value(kind), eventTag.Value(event)).Increment()
+	gcpmonitoring.IncrementConfigEventMeasure(kind, event)
 }
 
 func (h *cacheHandler) onEvent(old, curr interface{}, event model.Event) error {

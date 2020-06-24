@@ -21,6 +21,7 @@ import (
 
 	xdsapi "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 
+	"istio.io/istio/pilot/pkg/gcpmonitoring"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/util"
 )
@@ -43,10 +44,11 @@ func (s *DiscoveryServer) pushRoute(con *XdsConnection, push *model.PushContext,
 	rdsPushTime.Record(time.Since(pushStart).Seconds())
 	if err != nil {
 		adsLog.Warnf("RDS: Send failure for node:%v: %v", con.node.ID, err)
-		recordSendError(rdsSendErrPushes, err)
+		recordSendError("RDS", rdsSendErrPushes, err)
 		return err
 	}
 	rdsPushes.Increment()
+	gcpmonitoring.IncrementConfigPushMeasuare("RDS", true)
 
 	adsLog.Infof("RDS: PUSH for node:%s routes:%d", con.node.ID, len(rawRoutes))
 	return nil

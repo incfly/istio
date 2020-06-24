@@ -109,10 +109,10 @@ func (s *DiscoveryServer) handleCustomGenerator(con *XdsConnection, req *xdsapi.
 	err := con.send(resp)
 	if err != nil {
 		adsLog.Warnf("ADS: Send failure %s: %v", con.ConID, err)
-		recordSendError(apiSendErrPushes, err)
+		recordSendError("API", apiSendErrPushes, err)
 		return err
 	}
-	apiPushes.Increment()
+	incrementAPIPush()
 	w.LastSent = time.Now()
 	w.LastSize = sz // just resource size - doesn't include header and types
 	w.NonceSent = resp.Nonce
@@ -153,7 +153,7 @@ func (s *DiscoveryServer) pushGeneratorV2(con *XdsConnection, push *model.PushCo
 	err := con.send(resp)
 	if err != nil {
 		adsLog.Warnf("ADS: Send failure %s: %v", con.ConID, err)
-		recordSendError(apiSendErrPushes, err)
+		recordSendError("API", apiSendErrPushes, err)
 		return err
 	}
 	w.LastSent = time.Now()

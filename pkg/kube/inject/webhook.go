@@ -36,6 +36,7 @@ import (
 	"istio.io/api/annotation"
 	meshconfig "istio.io/api/mesh/v1alpha1"
 	"istio.io/istio/pilot/cmd/pilot-agent/status"
+	"istio.io/istio/pilot/pkg/gcpmonitoring"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pkg/config/mesh"
 
@@ -837,7 +838,7 @@ func (wh *Webhook) inject(ar *v1beta1.AdmissionReview, path string) *v1beta1.Adm
 			return &pt
 		}(),
 	}
-	totalSuccessfulInjections.Increment()
+	incrementSuccessInjection()
 	return &reviewResponse
 }
 
@@ -899,5 +900,15 @@ func (wh *Webhook) serveInject(w http.ResponseWriter, r *http.Request) {
 
 func handleError(message string) {
 	log.Errorf(message)
+	incrementFailedInjection()
+}
+
+func incrementSuccessInjection() {
+	totalSuccessfulInjections.Increment()
+	gcpmonitoring.IncrementSidecarInjection(true)
+}
+
+func incrementFailedInjection() {
 	totalFailedInjections.Increment()
+	gcpmonitoring.IncrementSidecarInjection(false)
 }
