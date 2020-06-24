@@ -83,6 +83,15 @@ function kind_load_images() {
   # If HUB starts with "docker.io/" removes that part so that filtering and loading below works
   local hub=${HUB#"docker.io/"}
 
+  # Special logic to pull promtheus image for promsd.
+  # Here we use 1.4.6-asm.0 because promtheus remains the same in 1.6.
+  docker pull gcr.io/gke-release/asm/prometheus:1.4.6-asm.0
+  docker pull gcr.io/gke-release/asm/stackdriver-prometheus-sidecar:1.4.6-asm.0
+  docker tag gcr.io/gke-release/asm/prometheus:1.4.6-asm.0 "${hub}/prometheus:${TAG}"
+  docker tag gcr.io/gke-release/asm/prometheus:1.4.6-asm.0 "${hub}/prometheus:${TAG}-distroless"
+  docker tag gcr.io/gke-release/asm/stackdriver-prometheus-sidecar:1.4.6-asm.0 "${hub}/stackdriver-prometheus-sidecar:${TAG}"
+  docker tag gcr.io/gke-release/asm/stackdriver-prometheus-sidecar:1.4.6-asm.0 "${hub}/stackdriver-prometheus-sidecar:${TAG}-distroless"
+
   for i in {1..3}; do
     # Archived local images and load it into KinD's docker daemon
     # Kubernetes in KinD can only access local images from its docker daemon.
