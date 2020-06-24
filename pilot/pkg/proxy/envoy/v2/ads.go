@@ -321,7 +321,7 @@ func (s *DiscoveryServer) handleLds(con *XdsConnection, discReq *xdsapi.Discover
 		if discReq.ErrorDetail != nil {
 			errCode := codes.Code(discReq.ErrorDetail.Code)
 			adsLog.Warnf("ADS:LDS: ACK ERROR %s %s:%s", con.ConID, errCode.String(), discReq.ErrorDetail.GetMessage())
-			incrementXDSRejects(ldsReject, con.node.ID, errCode.String())
+			incrementXDSRejects("LDS", ldsReject, con.node.ID, errCode.String())
 		} else if discReq.ResponseNonce != "" {
 			con.ListenerNonceAcked = discReq.ResponseNonce
 		}
@@ -343,7 +343,7 @@ func (s *DiscoveryServer) handleCds(con *XdsConnection, discReq *xdsapi.Discover
 		if discReq.ErrorDetail != nil {
 			errCode := codes.Code(discReq.ErrorDetail.Code)
 			adsLog.Warnf("ADS:CDS: ACK ERROR %s %s:%s", con.ConID, errCode.String(), discReq.ErrorDetail.GetMessage())
-			incrementXDSRejects(cdsReject, con.node.ID, errCode.String())
+			incrementXDSRejects("CDS", cdsReject, con.node.ID, errCode.String())
 		} else if discReq.ResponseNonce != "" {
 			con.ClusterNonceAcked = discReq.ResponseNonce
 		}
@@ -366,7 +366,7 @@ func (s *DiscoveryServer) handleEds(con *XdsConnection, discReq *xdsapi.Discover
 	if discReq.ErrorDetail != nil {
 		errCode := codes.Code(discReq.ErrorDetail.Code)
 		adsLog.Warnf("ADS:EDS: ACK ERROR %s %s:%s", con.ConID, errCode.String(), discReq.ErrorDetail.GetMessage())
-		incrementXDSRejects(edsReject, con.node.ID, errCode.String())
+		incrementXDSRejects("EDS", edsReject, con.node.ID, errCode.String())
 		return nil
 	}
 	clusters := discReq.GetResourceNames()
@@ -407,7 +407,7 @@ func (s *DiscoveryServer) handleRds(con *XdsConnection, discReq *xdsapi.Discover
 	if discReq.ErrorDetail != nil {
 		errCode := codes.Code(discReq.ErrorDetail.Code)
 		adsLog.Warnf("ADS:RDS: ACK ERROR %s %s:%s", con.ConID, errCode.String(), discReq.ErrorDetail.GetMessage())
-		incrementXDSRejects(rdsReject, con.node.ID, errCode.String())
+		incrementXDSRejects("RDS", rdsReject, con.node.ID, errCode.String())
 		return nil
 	}
 	routes := discReq.GetResourceNames()
@@ -668,7 +668,8 @@ func (s *DiscoveryServer) pushConnection(con *XdsConnection, pushEv *XdsEvent) e
 	} else if s.StatusReporter != nil {
 		s.StatusReporter.RegisterEvent(con.ConID, RouteType, pushEv.noncePrefix)
 	}
-	proxiesConvergeDelay.Record(time.Since(pushEv.start).Seconds())
+	latency := time.Since(pushEv.start).Seconds()
+	recordConvergencyDeley(latency)
 	return nil
 }
 

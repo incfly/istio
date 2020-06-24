@@ -26,6 +26,7 @@ import (
 
 	networkingapi "istio.io/api/networking/v1alpha3"
 
+	"istio.io/istio/pilot/pkg/gcpmonitoring"
 	"istio.io/istio/pilot/pkg/model"
 	networking "istio.io/istio/pilot/pkg/networking/core/v1alpha3"
 	"istio.io/istio/pilot/pkg/networking/core/v1alpha3/loadbalancer"
@@ -447,10 +448,11 @@ func (s *DiscoveryServer) pushEds(push *model.PushContext, con *XdsConnection, v
 	edsPushTime.Record(time.Since(pushStart).Seconds())
 	if err != nil {
 		adsLog.Warnf("EDS: Send failure %s: %v", con.ConID, err)
-		recordSendError(edsSendErrPushes, err)
+		recordSendError("EDS", edsSendErrPushes, err)
 		return err
 	}
 	edsPushes.Increment()
+	gcpmonitoring.IncrementConfigPushMeasuare("EDS", true)
 
 	if edsUpdatedServices == nil {
 		adsLog.Infof("EDS: PUSH for node:%s clusters:%d endpoints:%d empty:%v",

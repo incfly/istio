@@ -18,6 +18,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 
+	"istio.io/istio/pilot/pkg/gcpmonitoring"
 	"istio.io/istio/pilot/pkg/model"
 
 	"istio.io/istio/pkg/mcp/status"
@@ -175,6 +176,11 @@ func recordXDSClients(version string, delta float64) {
 	defer xdsClientTrackerMutex.Unlock()
 	xdsClientTracker[version] += delta
 	xdsClients.With(versionTag.Value(version)).Record(xdsClientTracker[version])
+	num := 0
+	for _, n := range xdsClientTracker {
+		num += int(n)
+	}
+	gcpmonitoring.RecordXdsClients(num)
 }
 
 func recordPushTriggers(reasons ...model.TriggerReason) {
@@ -183,19 +189,21 @@ func recordPushTriggers(reasons ...model.TriggerReason) {
 	}
 }
 
-func recordSendError(metric monitoring.Metric, err error) {
+func recordSendError(xdsType string, metric monitoring.Metric, err error) {
 	s, ok := status.FromError(err)
 	// Unavailable or canceled code will be sent when a connection is closing down. This is very normal,
 	// due to the XDS connection being dropped every 30 minutes, or a pod shutting down.
 	isError := s.Code() != codes.Unavailable && s.Code() != codes.Canceled
 	if !ok || isError {
 		metric.Increment()
+		gcpmonitoring.IncrementConfigPushMeasuare(xdsType, false)
 	}
 }
 
-func incrementXDSRejects(metric monitoring.Metric, node, errCode string) {
+func incrementXDSRejects(xdsType string, metric monitoring.Metric, node, errCode string) {
 	metric.With(nodeTag.Value(node), errTag.Value(errCode)).Increment()
 	totalXDSRejects.Increment()
+	gcpmonitoring.IncrementPilotReject(xdsType)
 }
 
 func init() {
@@ -220,4 +228,34 @@ func init() {
 		inboundUpdates,
 		pushTriggers,
 	)
+}
+
+func incrementAPIPush() {
+	apiPushes.Increment()
+	gcpmonitoring.IncrementConfigPushMeasuare("API", true)
+}
+
+func incrementCDSPush() {
+	cdsPushes.Increment()
+	gcpmonitoring.IncrementConfigPushMeasuare("CDS", true)
+}
+
+func incrementEDSPush() {
+	edsPushes.Increment()
+	gcpmonitoring.IncrementConfigPushMeasuare("EDS", true)
+}
+
+func incrementRDSPush() {
+	rdsPushes.Increment()
+	gcpmonitoring.IncrementConfigPushMeasuare("RDS", true)
+}
+
+func incrementLDSPush() {
+	ldsPushes.Increment()
+	gcpmonitoring.IncrementConfigPushMeasuare("LDS", true)
+}
+
+func recordConvergencyDeley(latency float64) {
+	proxiesConvergeDelay.Record(latency)
+	gcpmonitoring.RecordPilotConfigConvergence(latency)
 }

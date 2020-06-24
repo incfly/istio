@@ -19,6 +19,7 @@ import (
 
 	xdsapi "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 
+	"istio.io/istio/pilot/pkg/gcpmonitoring"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/util"
 )
@@ -36,10 +37,11 @@ func (s *DiscoveryServer) pushLds(con *XdsConnection, push *model.PushContext, v
 	ldsPushTime.Record(time.Since(pushStart).Seconds())
 	if err != nil {
 		adsLog.Warnf("LDS: Send failure %s: %v", con.ConID, err)
-		recordSendError(ldsSendErrPushes, err)
+		recordSendError("LDS", ldsSendErrPushes, err)
 		return err
 	}
 	ldsPushes.Increment()
+	gcpmonitoring.IncrementConfigPushMeasuare("LDS", true)
 
 	adsLog.Infof("LDS: PUSH for node:%s listeners:%d", con.node.ID, len(rawListeners))
 	return nil

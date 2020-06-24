@@ -21,8 +21,9 @@ import (
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
-
 	kubeApiAdmission "k8s.io/api/admission/v1beta1"
+
+	"istio.io/istio/pilot/pkg/gcpmonitoring"
 )
 
 const (
@@ -137,6 +138,7 @@ func reportValidationFailed(request *kubeApiAdmission.AdmissionRequest, reason s
 		scope.Errorf("Error creating monitoring context for reportValidationFailed: %v", err)
 	} else {
 		stats.Record(ctx, metricValidationFailed.M(1))
+		gcpmonitoring.IncrementConfigValidationMeasuare(request.Resource.Resource, false)
 	}
 }
 
@@ -149,6 +151,7 @@ func reportValidationPass(request *kubeApiAdmission.AdmissionRequest) {
 		scope.Errorf("Error creating monitoring context for reportValidationPass: %v", err)
 	} else {
 		stats.Record(ctx, metricValidationPassed.M(1))
+		gcpmonitoring.IncrementConfigValidationMeasuare(request.Resource.Resource, true)
 	}
 }
 

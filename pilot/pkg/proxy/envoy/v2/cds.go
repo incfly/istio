@@ -19,6 +19,7 @@ import (
 
 	xdsapi "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 
+	"istio.io/istio/pilot/pkg/gcpmonitoring"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/util"
 )
@@ -59,10 +60,11 @@ func (s *DiscoveryServer) pushCds(con *XdsConnection, push *model.PushContext, v
 	cdsPushTime.Record(time.Since(pushStart).Seconds())
 	if err != nil {
 		adsLog.Warnf("CDS: Send failure %s: %v", con.ConID, err)
-		recordSendError(cdsSendErrPushes, err)
+		recordSendError("CDS", cdsSendErrPushes, err)
 		return err
 	}
 	cdsPushes.Increment()
+	gcpmonitoring.IncrementConfigPushMeasuare("CDS", true)
 
 	// The response can't be easily read due to 'any' marshaling.
 	adsLog.Infof("CDS: PUSH for node:%s clusters:%d services:%d version:%s",
