@@ -224,6 +224,12 @@ spec:
           name: istio-certs
         - mountPath: /data
           name: data-volume
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+      - name: {{ . }}
+      {{- end }}
+      {{- end }}
       volumes:
       - configMap:
           defaultMode: 420
