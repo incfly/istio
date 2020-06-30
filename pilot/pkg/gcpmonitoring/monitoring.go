@@ -16,6 +16,7 @@ package gcpmonitoring
 
 import (
 	"context"
+	"strconv"
 
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
@@ -123,7 +124,7 @@ func IncrementConfigEventMeasure(t, operation string) {
 }
 
 func IncrementConfigValidationMeasuare(t string, success bool) {
-	ctx, err := tag.New(context.Background(), tag.Insert(typeKey, t), tag.Insert(successKey, isSuccess(success)))
+	ctx, err := tag.New(context.Background(), tag.Insert(typeKey, t), tag.Insert(successKey, strconv.FormatBool(success)))
 	if err != nil {
 		return
 	}
@@ -131,7 +132,7 @@ func IncrementConfigValidationMeasuare(t string, success bool) {
 }
 
 func IncrementConfigPushMeasuare(t string, success bool) {
-	ctx, err := tag.New(context.Background(), tag.Insert(typeKey, t), tag.Insert(successKey, isSuccess(success)))
+	ctx, err := tag.New(context.Background(), tag.Insert(typeKey, t), tag.Insert(successKey, strconv.FormatBool(success)))
 	if err != nil {
 		return
 	}
@@ -155,16 +156,9 @@ func RecordXdsClients(value int) {
 }
 
 func IncrementSidecarInjection(success bool) {
-	ctx, err := tag.New(context.Background(), tag.Insert(successKey, isSuccess(success)))
+	ctx, err := tag.New(context.Background(), tag.Insert(successKey, strconv.FormatBool(success)))
 	if err != nil {
 		return
 	}
 	stats.Record(ctx, sidecarInjectionMeasure.M(1))
-}
-
-func isSuccess(success bool) string {
-	if success {
-		return "true"
-	}
-	return "false"
 }
