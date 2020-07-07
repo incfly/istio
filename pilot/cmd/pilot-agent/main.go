@@ -68,6 +68,7 @@ var (
 	proxyIP            string
 	registryID         serviceregistry.ProviderID
 	trustDomain        string
+	discoveryAddress   string
 	pilotIdentity      string
 	mixerIdentity      string
 	stsPort            int
@@ -193,6 +194,11 @@ var (
 				log.Infof("Failed to serialize to YAML: %v", err)
 			} else {
 				log.Infof("Effective config: %s", out)
+			}
+
+			// Setter required for ASM Managed Control Plane
+			if discoveryAddress != "" {
+				proxyConfig.DiscoveryAddress = discoveryAddress
 			}
 
 			// If not set, set a default based on platform - podNamespace.svc.cluster.local for
@@ -417,6 +423,8 @@ func init() {
 		"Proxy unique ID. If not provided uses ${POD_NAME}.${POD_NAMESPACE} from environment variables")
 	proxyCmd.PersistentFlags().StringVar(&role.DNSDomain, "domain", "",
 		"DNS domain suffix. If not provided uses ${POD_NAMESPACE}.svc.cluster.local")
+	proxyCmd.PersistentFlags().StringVar(&discoveryAddress, "discoveryAddress", "",
+		"Override MeshConfig discovery address")
 	proxyCmd.PersistentFlags().StringVar(&trustDomain, "trust-domain", "",
 		"The domain to use for identities")
 	proxyCmd.PersistentFlags().StringVar(&pilotIdentity, "pilotIdentity", "",
