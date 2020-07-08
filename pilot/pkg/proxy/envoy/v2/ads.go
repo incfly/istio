@@ -15,6 +15,7 @@
 package v2
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,7 @@ import (
 	ads "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
@@ -34,6 +36,7 @@ import (
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/util"
 	v3 "istio.io/istio/pilot/pkg/proxy/envoy/v3"
+	"istio.io/istio/security/pkg/server/ca/authenticate"
 )
 
 var (
@@ -184,19 +187,66 @@ func receiveThread(con *XdsConnection, reqChannel chan *xdsapi.DiscoveryRequest,
 	}
 }
 
+// authenticate authenticates the ADS request using the configured authenticators.
+// Returns the validated principals or an error.
+// If no authenticators are configured, or if the request is on a non-secure
+// stream ( 15010 ) - returns an empty list of principals and no errors.
+func (s *DiscoveryServer) authenticate(ctx context.Context) ([]string, error) {
+	// Authenticate - currently just checks that request has a certificate signed with the our key.
+	// Protected by flag to avoid breaking upgrades - should be enabled in multi-cluster/meshexpansion where
+	// XDS is exposed.
+	if s.Authenticators != nil && len(s.Authenticators) > 0 {
+		peerInfo, ok := peer.FromContext(ctx)
+		if !ok {
+			return nil, errors.New("invalid context")
+		}
+		if err := credentials.CheckSecurityLevel(ctx, credentials.PrivacyAndIntegrity); err == nil {
+			var authenticatedID *authenticate.Caller
+			for _, authn := range s.Authenticators {
+				u, err := authn.Authenticate(ctx)
+				if u != nil && err == nil {
+					authenticatedID = u
+				}
+			}
+
+			if authenticatedID == nil {
+				adsLog.Errora("Failed to authenticate client ", peerInfo)
+				return nil, errors.New("authentication failure")
+			}
+
+			return authenticatedID.Identities, nil
+		}
+	}
+
+	// TODO: add a flag to prevent unauthenticated requests ( 15010 )
+	// request not over TLS ( on the insecure port
+	return nil, nil
+}
+
 // StreamAggregatedResources implements the ADS interface.
 func (s *DiscoveryServer) StreamAggregatedResources(stream ads.AggregatedDiscoveryService_StreamAggregatedResourcesServer) error {
-	peerInfo, ok := peer.FromContext(stream.Context())
+	ctx := stream.Context()
+	peerInfo, ok := peer.FromContext(ctx)
 	peerAddr := "0.0.0.0"
 	if ok {
 		peerAddr = peerInfo.Addr.String()
+	}
+
+	ids, err := s.authenticate(ctx)
+	if err != nil {
+		return err
+	}
+	if ids != nil {
+		adsLog.Infoa("Authenticated XDS: ", peerInfo, ids)
+	} else {
+		adsLog.Infoa("Unauthenticated XDS: ", peerInfo)
 	}
 
 	// first call - lazy loading, in tests. This should not happen if readiness
 	// check works, since it assumes ClearCache is called (and as such PushContext
 	// is initialized)
 	// InitContext returns immediately if the context was already initialized.
-	err := s.globalPushContext().InitContext(s.Env, nil, nil)
+	err = s.globalPushContext().InitContext(s.Env, nil, nil)
 	if err != nil {
 		// Error accessing the data - log and close, maybe a different pilot replica
 		// has more luck
@@ -229,6 +279,7 @@ func (s *DiscoveryServer) StreamAggregatedResources(stream ads.AggregatedDiscove
 			}
 			// This should be only set for the first request. The node id may not be set - for example malicious clients.
 			if con.node == nil {
+				// TODO: We should validate that the namespace in the cert matches the claimed namespace in metadata.
 				if err := s.initConnection(discReq.Node, con); err != nil {
 					return err
 				}

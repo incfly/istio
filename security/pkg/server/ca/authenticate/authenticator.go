@@ -45,12 +45,6 @@ const (
 	AuthSourceIDToken
 )
 
-// Caller carries the identity and authentication source of a caller.
-type Caller struct {
-	AuthSource AuthSource
-	Identities []string
-}
-
 // ClientCertAuthenticator extracts identities from client certificate.
 type ClientCertAuthenticator struct{}
 
