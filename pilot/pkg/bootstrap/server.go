@@ -64,6 +64,7 @@ import (
 	istiokeepalive "istio.io/istio/pkg/keepalive"
 	kubelib "istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/inject"
+	"istio.io/istio/pkg/spiffe"
 	"istio.io/istio/security/pkg/k8s/chiron"
 	"istio.io/istio/security/pkg/pki/ca"
 )
@@ -605,12 +606,23 @@ func (s *Server) initSecureGrpcServer(port string, keepalive *istiokeepalive.Opt
 	}
 
 	cp.AppendCertsFromPEM(rootCertBytes)
+	if features.SpiffeBundlePaths != "" {
+		certMap, err := spiffe.RetrieveSpiffeBundleRootCertsFromStringInput(features.SpiffeBundlePaths, []*x509.Certificate{})
+		if err != nil {
+			return err
+		}
+		// Add all the retrieved CA certs into the cert pool for general X.509 cert verification.
+		for _, certs := range certMap {
+			for _, cert := range certs {
+				cp.AddCert(cert)
+			}
+		}
+	}
 
 	cfg := &tls.Config{
 		Certificates: []tls.Certificate{certP},
-		// Note: this is a temporary fix before istiod is able to load CA certificate to authenticate clients.
-		ClientAuth: tls.NoClientCert,
-		ClientCAs:  cp,
+		ClientAuth:   tls.VerifyClientCertIfGiven,
+		ClientCAs:    cp,
 	}
 
 	tlsCreds := credentials.NewTLS(cfg)
