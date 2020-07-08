@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -154,6 +155,9 @@ type Server struct {
 	// Note: this is still best effort; a process can die at any time.
 	requiredTerminations sync.WaitGroup
 	statusReporter       *status.Reporter
+
+	// The SPIFFE based cert verifier
+	peerCertVerifier *spiffe.PeerCertVerifier
 }
 
 // NewServer creates a new Server instance based on the provided arguments.
@@ -229,6 +233,11 @@ func NewServer(args *PilotArgs) (*Server, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error initializing public key: %v", err)
 		}
+	}
+
+	// Initialize the SPIFFE peer cert verifier.
+	if err := s.setPeerCertVerifier(args.TLSOptions); err != nil {
+		return nil, err
 	}
 
 	// Secure gRPC Server must be initialized after CA is created as may use a Citadel generated cert.
@@ -584,6 +593,12 @@ func (s *Server) initDNSTLSListener(dns string, tlsOptions TLSOptions) error {
 
 // initialize secureGRPCServer - using DNS certs
 func (s *Server) initSecureGrpcServer(port string, keepalive *istiokeepalive.Options, tlsOptions TLSOptions) error {
+	if s.peerCertVerifier == nil {
+		// Running locally without configured certs - no TLS mode
+		log.Warnf("The secure discovery service is disabled")
+		return nil
+	}
+
 	certDir := dnsCertDir
 
 	key := model.GetOrDefault(tlsOptions.KeyFile, path.Join(certDir, constants.KeyFilename))
@@ -594,35 +609,11 @@ func (s *Server) initSecureGrpcServer(port string, keepalive *istiokeepalive.Opt
 		return err
 	}
 
-	cp := x509.NewCertPool()
-	var rootCertBytes []byte
-	if tlsOptions.CaCertFile != "" {
-		rootCertBytes, err = ioutil.ReadFile(tlsOptions.CaCertFile)
-		if err != nil {
-			return err
-		}
-	} else {
-		rootCertBytes = s.ca.GetCAKeyCertBundle().GetRootCertPem()
-	}
-
-	cp.AppendCertsFromPEM(rootCertBytes)
-	if features.SpiffeBundlePaths != "" {
-		certMap, err := spiffe.RetrieveSpiffeBundleRootCertsFromStringInput(features.SpiffeBundlePaths, []*x509.Certificate{})
-		if err != nil {
-			return err
-		}
-		// Add all the retrieved CA certs into the cert pool for general X.509 cert verification.
-		for _, certs := range certMap {
-			for _, cert := range certs {
-				cp.AddCert(cert)
-			}
-		}
-	}
-
 	cfg := &tls.Config{
-		Certificates: []tls.Certificate{certP},
-		ClientAuth:   tls.VerifyClientCertIfGiven,
-		ClientCAs:    cp,
+		Certificates:          []tls.Certificate{certP},
+		ClientAuth:            tls.VerifyClientCertIfGiven,
+		ClientCAs:             s.peerCertVerifier.GetGeneralCertPool(),
+		VerifyPeerCertificate: s.peerCertVerifier.VerifyPeerCert,
 	}
 
 	tlsCreds := credentials.NewTLS(cfg)
@@ -820,10 +811,6 @@ func (s *Server) initSecureGrpcListener(args *PilotArgs) error {
 		// Feature disabled
 		return nil
 	}
-	if args.TLSOptions.CaCertFile == "" && s.ca == nil {
-		// Running locally without configured certs - no TLS mode
-		return nil
-	}
 
 	// validate
 	host, port, err := net.SplitHostPort(istiodAddr)
@@ -854,4 +841,46 @@ func (s *Server) fetchCARoot() map[string]string {
 	return map[string]string{
 		constants.CACertNamespaceConfigMapDataName: string(s.ca.GetCAKeyCertBundle().GetRootCertPem()),
 	}
+}
+
+// setPeerCertVerifier sets up a SPIFFE certificate verifier with the current istiod configuration.
+func (s *Server) setPeerCertVerifier(tlsOptions TLSOptions) error {
+	if tlsOptions.CaCertFile == "" && s.ca == nil && features.SpiffeBundleEndpoints == "" {
+		// Running locally without configured certs - no TLS mode
+		log.Warnf("Skip setting peer cert verifier.")
+		return nil
+	}
+	s.peerCertVerifier = spiffe.NewPeerCertVerifier()
+	var rootCertBytes []byte
+	var err error
+	if tlsOptions.CaCertFile != "" {
+		if rootCertBytes, err = ioutil.ReadFile(tlsOptions.CaCertFile); err != nil {
+			return err
+		}
+	} else if s.ca != nil {
+		rootCertBytes = s.ca.GetCAKeyCertBundle().GetRootCertPem()
+	}
+
+	if len(rootCertBytes) != 0 {
+		block, _ := pem.Decode(rootCertBytes)
+		if block == nil {
+			return fmt.Errorf("failed to decode root cert PEM")
+		}
+		rootCert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return fmt.Errorf("failed to parse certificate: %v", err)
+		}
+		s.peerCertVerifier.AddMapping(spiffe.GetTrustDomain(), []*x509.Certificate{rootCert})
+	}
+
+	if features.SpiffeBundleEndpoints != "" {
+		certMap, err := spiffe.RetrieveSpiffeBundleRootCertsFromStringInput(
+			features.SpiffeBundleEndpoints, []*x509.Certificate{})
+		if err != nil {
+			return err
+		}
+		s.peerCertVerifier.AddMappings(certMap)
+	}
+
+	return nil
 }
