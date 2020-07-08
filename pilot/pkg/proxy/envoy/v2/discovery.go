@@ -27,6 +27,7 @@ import (
 	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/core"
+	"istio.io/istio/security/pkg/server/ca/authenticate"
 )
 
 var (
@@ -124,6 +125,9 @@ type DiscoveryServer struct {
 	adsClientsMutex sync.RWMutex
 
 	StatusReporter DistributionStatusCache
+
+	// Authenticators for XDS requests. Should be same/subset of the CA authenticators.
+	Authenticators []authenticate.Authenticator
 }
 
 // EndpointShards holds the set of endpoint shards of a service. Registries update
@@ -159,6 +163,17 @@ func NewDiscoveryServer(env *model.Environment, plugins []string) *DiscoveryServ
 		DebugConfigs:            features.DebugConfigs,
 		debugHandlers:           map[string]string{},
 		adsClients:              map[string]*XdsConnection{},
+	}
+
+	if features.XDSAuth {
+		// This is equivalent with the mTLS authentication for workload-to-workload.
+		// The GRPC server is configured in bootstrap.initSecureDiscoveryService, using the root
+		// certificate as 'ClientCAs'. To accept additional signers for client identities - add them
+		// there, will be used for CA signing as well.
+		out.Authenticators = append(out.Authenticators, &authenticate.ClientCertAuthenticator{})
+
+		// TODO: we may want to support JWT/OIDC auth as well - using the same list of auth as
+		// CA. Will require additional refactoring - probably best for 1.7.
 	}
 
 	// Flush cached discovery responses when detecting jwt public key change.
