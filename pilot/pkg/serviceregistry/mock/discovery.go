@@ -240,8 +240,8 @@ func (sd *ServiceDiscovery) GetProxyWorkloadLabels(proxy *model.Proxy) (labels.C
 func (sd *ServiceDiscovery) GetIstioServiceAccounts(svc *model.Service, ports []int) []string {
 	if svc.Hostname == "world.default.svc.cluster.local" {
 		return []string{
-			spiffe.MustGenSpiffeURI("default", "serviceaccount1"),
-			spiffe.MustGenSpiffeURI("default", "serviceaccount2"),
+			spiffe.MustGenSpiffeURI(spiffe.GetLocalTrustDomain(), "default", "serviceaccount1"),
+			spiffe.MustGenSpiffeURI(spiffe.GetLocalTrustDomain(), "default", "serviceaccount2"),
 		}
 	}
 	return make([]string, 0)
