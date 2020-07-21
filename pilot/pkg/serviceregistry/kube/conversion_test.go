@@ -136,7 +136,7 @@ func TestServiceConversion(t *testing.T) {
 	saC := "spiffe://accounts.google.com/serviceaccountC@cloudservices.gserviceaccount.com"
 	saD := "spiffe://accounts.google.com/serviceaccountD@developer.gserviceaccount.com"
 
-	oldTrustDomain := spiffe.GetTrustDomain()
+	oldTrustDomain := spiffe.GetLocalTrustDomain()
 	spiffe.SetTrustDomain(domainSuffix)
 	defer spiffe.SetTrustDomain(oldTrustDomain)
 
@@ -500,7 +500,7 @@ func TestSecureNamingSANCustomIdentity(t *testing.T) {
 
 	san := SecureNamingSAN(pod)
 
-	expectedSAN := fmt.Sprintf("spiffe://%v/%v", spiffe.GetTrustDomain(), identity)
+	expectedSAN := fmt.Sprintf("spiffe://%v/%v", spiffe.GetLocalTrustDomain(), identity)
 
 	if san != expectedSAN {
 		t.Fatalf("SAN match failed, SAN:%v  expectedSAN:%v", san, expectedSAN)
@@ -521,7 +521,7 @@ func TestSecureNamingSAN(t *testing.T) {
 
 	san := SecureNamingSAN(pod)
 
-	expectedSAN := fmt.Sprintf("spiffe://%v/ns/%v/sa/%v", spiffe.GetTrustDomain(), ns, sa)
+	expectedSAN := fmt.Sprintf("spiffe://%v/ns/%v/sa/%v", spiffe.GetLocalTrustDomain(), ns, sa)
 
 	if san != expectedSAN {
 		t.Fatalf("SAN match failed, SAN:%v  expectedSAN:%v", san, expectedSAN)

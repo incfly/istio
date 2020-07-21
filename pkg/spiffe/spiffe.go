@@ -63,7 +63,8 @@ func SetTrustDomain(value string) {
 	trustDomainMutex.Unlock()
 }
 
-func GetTrustDomain() string {
+// jianfeih here, swap the calling to GetTrustDomainByCluster later with an empty cluster ID.
+func GetLocalTrustDomain() string {
 	trustDomainMutex.RLock()
 	defer trustDomainMutex.RUnlock()
 	return trustDomain
@@ -73,7 +74,10 @@ func GetTrustDomainByCluster(clusterID string) string {
 	spiffeLog.Infof("jianfeih debug GetTrustDomainByCluster cluster ID %v", clusterID)
 	// jianfeih here, hardcode for POC.
 	if clusterID == "meshca2" {
+		spiffeLog.Infof("jianfeih GetTrustDomainByCluster special case clusterID %v, td jianfeih-10.svc.id.goog")
 		return "jianfeih-10.svc.id.goog"
+	} else {
+		spiffeLog.Infof("jianfeih GetTrustDomainByCluster clusterID %v, no special casing.")
 	}
 	return GetLocalTrustDomain()
 }
@@ -98,26 +102,29 @@ func GenSpiffeURI(ns, serviceAccount string) (string, error) {
 		err = fmt.Errorf(
 			"namespace or service account empty for SPIFFE uri ns=%v serviceAccount=%v", ns, serviceAccount)
 	}
-	return URIPrefix + GetTrustDomain() + "/ns/" + ns + "/sa/" + serviceAccount, err
+	return URIPrefix + GetLocalTrustDomain() + "/ns/" + ns + "/sa/" + serviceAccount, err
 }
 
 // MustGenSpiffeURI returns the formatted uri(SPIFFE format for now) for the certificate and logs if there was an error.
-func MustGenSpiffeURI(ns, serviceAccount string) string {
-	uri, err := GenSpiffeURI(ns, serviceAccount)
-	if err != nil {
-		spiffeLog.Debug(err.Error())
+func MustGenSpiffeURI(trustDomain, ns, serviceAccount string) string {
+	if ns == "" {
+		return GenCustomSpiffe(trustDomain, serviceAccount)
 	}
-	return uri
+	localTD := GetLocalTrustDomain()
+	// jianfeih: just to be safe now...
+	if localTD != trustDomain {
+		return URIPrefix + trustDomain + "/ns/" + ns + "/sa/" + serviceAccount
+	}
+	return URIPrefix + GetLocalTrustDomain() + "/ns/" + ns + "/sa/" + serviceAccount
 }
 
 // GenCustomSpiffe returns the  spiffe string that can have a custom structure
-func GenCustomSpiffe(identity string) string {
-	if identity == "" {
-		spiffeLog.Error("spiffe identity can't be empty")
-		return ""
+func GenCustomSpiffe(trustDomain string, identity string) string {
+	if trustDomain == "" || identity == "" {
+		spiffeLog.Errorf("spiffe identity or trust domain  can't be empty, %v, %v", trustDomain, identity)
 	}
 
-	return URIPrefix + GetTrustDomain() + "/" + identity
+	return URIPrefix + GetLocalTrustDomain() + "/" + identity
 }
 
 // GetTrustDomainFromURISAN extracts the trust domain part from the URI SAN in the X.509 certificate.

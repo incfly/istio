@@ -155,7 +155,10 @@ func convertEndpoint(service *model.Service, servicePort *networking.Port,
 
 	sa := ""
 	if endpoint.ServiceAccount != "" {
-		sa = spiffe.MustGenSpiffeURI(service.Attributes.Namespace, endpoint.ServiceAccount)
+		// N.B(incfly): here we use the local trust domain for service entry conversion since
+		// This is the current behavior; the trsut domain of the cluster where the service entry resource
+		// resides in should be used.
+		sa = spiffe.MustGenSpiffeURI(spiffe.GetLocalTrustDomain(), service.Attributes.Namespace, endpoint.ServiceAccount)
 	}
 	return &model.ServiceInstance{
 		Endpoint: &model.IstioEndpoint{

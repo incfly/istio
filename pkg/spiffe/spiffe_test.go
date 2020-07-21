@@ -270,7 +270,7 @@ hGPitf1iUqSP+PmgXtcb2OVrCouNCAlpXLRnRY3DuVbAx4GeYs1FvYXi5aiR
 )
 
 func TestGenSpiffeURI(t *testing.T) {
-	oldTrustDomain := GetTrustDomain()
+	oldTrustDomain := GetLocalTrustDomain()
 	defer SetTrustDomain(oldTrustDomain)
 
 	testCases := []struct {
@@ -330,7 +330,7 @@ func TestGenSpiffeURI(t *testing.T) {
 }
 
 func TestGetSetTrustDomain(t *testing.T) {
-	oldTrustDomain := GetTrustDomain()
+	oldTrustDomain := GetLocalTrustDomain()
 	defer SetTrustDomain(oldTrustDomain)
 
 	cases := []struct {
@@ -349,8 +349,8 @@ func TestGetSetTrustDomain(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.in, func(t *testing.T) {
 			SetTrustDomain(c.in)
-			if GetTrustDomain() != c.out {
-				t.Errorf("expected=%s, actual=%s", c.out, GetTrustDomain())
+			if GetLocalTrustDomain() != c.out {
+				t.Errorf("expected=%s, actual=%s", c.out, GetLocalTrustDomain())
 			}
 		})
 	}
@@ -363,7 +363,7 @@ func TestMustGenSpiffeURI(t *testing.T) {
 }
 
 func TestGenCustomSpiffe(t *testing.T) {
-	oldTrustDomain := GetTrustDomain()
+	oldTrustDomain := GetLocalTrustDomain()
 	defer SetTrustDomain(oldTrustDomain)
 
 	testCases := []struct {

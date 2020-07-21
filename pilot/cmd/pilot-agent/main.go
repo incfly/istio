@@ -377,13 +377,13 @@ func setSpiffeTrustDomain(podNamespace string, domain string) {
 	spiffe.SetTrustDomain(pilotTrustDomain)
 }
 
+// TODO(myipdt/incfly/tairan): move this to SPIFFE libary.
 func getSAN(ns string, defaultSA string, overrideIdentity string) []string {
 	var san []string
 	if overrideIdentity == "" {
-		san = append(san, envoyDiscovery.GetSAN(ns, defaultSA))
+		san = append(san, spiffe.MustGenSpiffeURI(spiffe.GetLocalTrustDomain(), ns, defaultSA))
 	} else {
-		san = append(san, envoyDiscovery.GetSAN("", overrideIdentity))
-
+		san = append(san, spiffe.MustGenSpiffeURI(spiffe.GetLocalTrustDomain(), "", overrideIdentity))
 	}
 	return san
 }

@@ -20,6 +20,7 @@ import (
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/serviceregistry/kube"
 	"istio.io/istio/pkg/config/labels"
+	"istio.io/istio/pkg/spiffe"
 	"istio.io/pkg/log"
 )
 
@@ -39,8 +40,9 @@ func NewEndpointBuilder(c *Controller, pod *v1.Pod) *EndpointBuilder {
 	var podLabels labels.Instance
 	if pod != nil {
 		locality = c.getPodLocality(pod)
-		sa = kube.SecureNamingSAN(pod)
-		log.Infof("jianfeih NewEndpointBuilder, pod name %v, sa %v, cluster ID %v", pod.Name, sa, c.clusterID)
+		td := spiffe.GetTrustDomainByCluster(c.clusterID)
+		sa = kube.SecureNamingSAN(td, pod)
+		log.Infof("jianfeih NewEndpointBuilder, pod name %v, sa %v, cluster ID %v, td %v", pod.Name, sa, c.clusterID, td)
 		uid = createUID(pod.Name, pod.Namespace)
 		podLabels = pod.Labels
 	}

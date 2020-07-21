@@ -860,7 +860,7 @@ func TestGetProxyServiceInstancesWithMultiIPsAndTargetPorts(t *testing.T) {
 }
 
 func TestController_GetIstioServiceAccounts(t *testing.T) {
-	oldTrustDomain := spiffe.GetTrustDomain()
+	oldTrustDomain := spiffe.GetLocalTrustDomain()
 	spiffe.SetTrustDomain(domainSuffix)
 	defer spiffe.SetTrustDomain(oldTrustDomain)
 
