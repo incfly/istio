@@ -40,7 +40,7 @@ func NewEndpointBuilder(c *Controller, pod *v1.Pod) *EndpointBuilder {
 	if pod != nil {
 		locality = c.getPodLocality(pod)
 		sa = kube.SecureNamingSAN(pod)
-		log.Infof("jianfeih NewEndpointBuilder, pod name %v, sa %v", pod.Name, sa)
+		log.Infof("jianfeih NewEndpointBuilder, pod name %v, sa %v, cluster ID %v", pod.Name, sa, c.clusterID)
 		uid = createUID(pod.Name, pod.Namespace)
 		podLabels = pod.Labels
 	}

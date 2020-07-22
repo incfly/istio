@@ -69,6 +69,18 @@ func GetTrustDomain() string {
 	return trustDomain
 }
 
+func GetTrustDomainByCluster(clusterID string) string {
+	spiffeLog.Infof("jianfeih debug GetTrustDomainByCluster cluster ID %v", clusterID)
+	// jianfeih here, hardcode for POC.
+	if clusterID == "meshca2" {
+		return "jianfeih-10.svc.id.goog"
+	}
+	return GetLocalTrustDomain()
+}
+
+func SetTrustDomainByCluster(clusterID string, trustDomain string) {
+}
+
 func DetermineTrustDomain(commandLineTrustDomain string, isKubernetes bool) string {
 	if len(commandLineTrustDomain) != 0 {
 		return commandLineTrustDomain

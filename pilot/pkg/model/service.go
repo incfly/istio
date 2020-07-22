@@ -650,6 +650,7 @@ func GetServiceAccounts(svc *Service, ports []int, discovery ServiceDiscovery) [
 	condition := strings.Contains(string(svc.Hostname), "hello") || strings.Contains(string(svc.Hostname), "httpbin")
 	for _, si := range instances {
 		if si.Endpoint.ServiceAccount != "" {
+			log.Infof("jianfeih here GetServiceAccounts the endpoint %+v", *si.Endpoint)
 			sa.Insert(si.Endpoint.ServiceAccount)
 		}
 
