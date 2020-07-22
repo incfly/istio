@@ -1084,7 +1084,9 @@ func (c *Controller) GetProxyWorkloadLabels(proxy *model.Proxy) (labels.Collecti
 // For example, a service account named "bar" in namespace "foo" is encoded as
 // "spiffe://cluster.local/ns/foo/sa/bar".
 func (c *Controller) GetIstioServiceAccounts(svc *model.Service, ports []int) []string {
-	return model.GetServiceAccounts(svc, ports, c)
+	sa := model.GetServiceAccounts(svc, ports, c)
+	log.Infof("jianfeih kube/controller/GetIstioServiceAccounts %v, port %v, sa %v", svc.Hostname, ports, sa)
+	return sa
 }
 
 // AppendServiceHandler implements a service catalog operation

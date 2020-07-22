@@ -1053,6 +1053,8 @@ func (ps *PushContext) initServiceAccounts(env *Environment, services []*Service
 				continue
 			}
 			ps.ServiceAccounts[svc.Hostname][port.Port] = env.GetIstioServiceAccounts(svc, []int{port.Port})
+			log.Infof("jianfeih initSerivceAccounts host name %v, port %v, sa %v",
+				svc.Hostname, port.Port, ps.ServiceAccounts[svc.Hostname][port.Port])
 		}
 	}
 }

@@ -16,6 +16,7 @@ package v1alpha3
 
 import (
 	"fmt"
+	"strings"
 
 	cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -70,6 +71,11 @@ func (cb *ClusterBuilder) applyDestinationRule(c *cluster.Cluster, clusterMode C
 	}
 
 	if clusterMode == DefaultClusterMode {
+		if strings.Contains(string(service.Hostname), "hello") ||
+			strings.Contains(string(service.Hostname), "httpbin") {
+			log.Infof("jianfeih applyDestinationRule host %v, sa %v",
+				service.Hostname, cb.push.ServiceAccounts[service.Hostname][port.Port])
+		}
 		opts.serviceAccounts = cb.push.ServiceAccounts[service.Hostname][port.Port]
 		opts.istioMtlsSni = model.BuildDNSSrvSubsetKey(model.TrafficDirectionOutbound, "", service.Hostname, port.Port)
 		opts.simpleTLSSni = string(service.Hostname)
