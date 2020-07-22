@@ -29,7 +29,6 @@ if [[ "${VERBOSE}" == "1" ]];then
     V="-x"
 fi
 set -x
-
 SCRIPTPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 OUT=${1:?"output path"}
@@ -49,8 +48,7 @@ GOBUILDFLAGS=${GOBUILDFLAGS:-""}
 IFS=' ' read -r -a GOBUILDFLAGS_ARRAY <<< "$GOBUILDFLAGS"
 
 GCFLAGS=${GCFLAGS:-}
-export CGO_ENABLED=${CGO_ENABLED:1}
-
+export CGO_ENABLED=${CGO_ENABLED:-1}
 if [[ "${STATIC}" !=  "1" && "${CGO_ENABLED}" == 0 ]];then
     LDFLAGS=""
 fi
