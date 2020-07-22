@@ -583,6 +583,7 @@ func GetServiceAccounts(svc *Service, ports []int, discovery ServiceDiscovery) [
 
 	for _, si := range instances {
 		if si.Endpoint.ServiceAccount != "" {
+			log.Infof("jianfeih here GetServiceAccounts the endpoint %+v", *si.Endpoint)
 			sa.Insert(si.Endpoint.ServiceAccount)
 		}
 	}

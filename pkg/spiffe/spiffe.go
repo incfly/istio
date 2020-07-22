@@ -73,7 +73,11 @@ func GetLocalTrustDomain() string {
 
 func GetTrustDomainByCluster(clusterID string) string {
 	spiffeLog.Infof("jianfeih debug GetTrustDomainByCluster cluster ID %v", clusterID)
-	return ""
+	// jianfeih here, hardcode for POC.
+	if clusterID == "meshca2" {
+		return "jianfeih-10.svc.id.goog"
+	}
+	return GetLocalTrustDomain()
 }
 
 func SetTrustDomainByCluster(clusterID string, trustDomain string) {

@@ -123,9 +123,9 @@ func (m *Multicluster) AddMemberCluster(clients kubelib.Client, clusterID string
 		Metrics:           m.metrics,
 	}
 	kubectl := NewController(clients, options)
-
 	remoteKubeController.Controller = kubectl
 	m.serviceController.AddRegistry(kubectl)
+	log.Infof("jianfeih debug AddMemberCluster clusterID %v", clusterID)
 
 	m.remoteKubeControllers[clusterID] = &remoteKubeController
 	m.m.Unlock()
