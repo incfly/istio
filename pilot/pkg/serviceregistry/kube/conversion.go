@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"istio.io/api/annotation"
+	"istio.io/pkg/log"
 
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/serviceregistry"
@@ -115,6 +116,11 @@ func ConvertService(svc coreV1.Service, domainSuffix string, clusterID string) *
 			UID:             formatUID(svc.Namespace, svc.Name),
 			ExportTo:        exportTo,
 		},
+	}
+
+	condition := strings.Contains(string(istioService.Hostname), "hello") || strings.Contains(string(istioService.Hostname), "httpbin")
+	if condition {
+		log.Infof("jianfeih kube/conversion.go host %v, sa %v", istioService.Hostname, serviceaccounts)
 	}
 
 	switch svc.Spec.Type {

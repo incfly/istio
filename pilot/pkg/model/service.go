@@ -38,6 +38,7 @@ import (
 
 	authn "istio.io/api/authentication/v1alpha1"
 
+	"istio.io/istio/pilot/pkg/util/sets"
 	"istio.io/istio/pkg/config/host"
 	"istio.io/istio/pkg/config/labels"
 	"istio.io/istio/pkg/config/protocol"
@@ -628,6 +629,39 @@ func GetTLSModeFromEndpointLabels(labels map[string]string) string {
 		}
 	}
 	return DisabledTLSModeLabel
+}
+
+// GetServiceAccounts returns aggregated list of service accounts of Service plus its instances.
+func GetServiceAccounts(svc *Service, ports []int, discovery ServiceDiscovery) []string {
+	sa := sets.Set{}
+
+	instances := make([]*ServiceInstance, 0)
+	// Get the service accounts running service within Kubernetes. This is reflected by the pods that
+	// the service is deployed on, and the service accounts of the pods.
+	for _, port := range ports {
+		svcInstances, err := discovery.InstancesByPort(svc, port, labels.Collection{})
+		if err != nil {
+			log.Warnf("InstancesByPort(%s:%d) error: %v", svc.Hostname, port, err)
+			return nil
+		}
+		instances = append(instances, svcInstances...)
+	}
+
+	condition := strings.Contains(string(svc.Hostname), "hello") || strings.Contains(string(svc.Hostname), "httpbin")
+	for _, si := range instances {
+		if si.Endpoint.ServiceAccount != "" {
+			sa.Insert(si.Endpoint.ServiceAccount)
+		}
+
+	}
+	if condition {
+		log.Infof("jianfeih model/GetServiceAccounts p1: %v", sa)
+	}
+	sa.Insert(svc.ServiceAccounts...)
+	if condition {
+		log.Infof("jianfeih model/GetServiceAccounts p2: %v", sa)
+	}
+	return sa.UnsortedList()
 }
 
 // DeepCopy creates a clone of Service.
