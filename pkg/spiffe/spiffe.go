@@ -76,8 +76,9 @@ func GetTrustDomainByCluster(clusterID string) string {
 	if clusterID == "meshca2" {
 		spiffeLog.Infof("jianfeih GetTrustDomainByCluster special case clusterID %v, td jianfeih-10.svc.id.goog")
 		return "jianfeih-10.svc.id.goog"
-	} else {
-		spiffeLog.Infof("jianfeih GetTrustDomainByCluster clusterID %v, no special casing.")
+	} else if clusterID == "meshca1" {
+		spiffeLog.Infof("jianfeih GetTrustDomainByCluster special case clusterID %v, td jianfeih-test.svc.id.goog")
+		return "jianfeih-test.svc.id.goog"
 	}
 	return GetLocalTrustDomain()
 }

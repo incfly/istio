@@ -15,6 +15,7 @@
 package aggregate
 
 import (
+	"strings"
 	"sync"
 
 	"istio.io/istio/pilot/pkg/features"
@@ -365,10 +366,20 @@ func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.
 
 // GetIstioServiceAccounts implements model.ServiceAccounts operation
 func (c *Controller) GetIstioServiceAccounts(svc *model.Service, ports []int) []string {
+	// jianfeih here, i guess it's here for init Service account.
+	out := map[string]struct{}{}
 	for _, r := range c.GetRegistries() {
-		if svcAccounts := r.GetIstioServiceAccounts(svc, ports); svcAccounts != nil {
-			return svcAccounts
+		svcAccounts := r.GetIstioServiceAccounts(svc, ports)
+		for _, sa := range svcAccounts {
+			out[sa] = struct{}{}
+		}
+		if strings.Contains(string(svc.Hostname), "hello") || strings.Contains(string(svc.Hostname), "httpbin") {
+			log.Infof("jianfeih aggregate controller GetIstioServiceAccount, name %v, sa %v", r.Cluster(), svcAccounts)
 		}
 	}
-	return nil
+	result := []string{}
+	for k := range out {
+		result = append(result, k)
+	}
+	return result
 }
