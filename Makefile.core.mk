@@ -400,9 +400,9 @@ DEBUG_LDFLAGS='-extldflags "-static"'
 ${ISTIO_OUT}/release/istioctl-linux-amd64: depend
 	STATIC=0 GOOS=linux GOARCH=amd64 LDFLAGS=$(RELEASE_LDFLAGS) common/scripts/gobuild.sh $@ ./istioctl/cmd/istioctl
 ${ISTIO_OUT}/release/istioctl-linux-armv7: depend
-	STATIC=0 GOOS=linux GOARCH=arm GOARM=7 LDFLAGS=$(RELEASE_LDFLAGS) common/scripts/gobuild.sh $@ ./istioctl/cmd/istioctl
+	STATIC=0 GOOS=linux GOARCH=arm GOARM=7 LDFLAGS=$(RELEASE_LDFLAGS) CGO_ENABLED=0 common/scripts/gobuild.sh $@ ./istioctl/cmd/istioctl
 ${ISTIO_OUT}/release/istioctl-linux-arm64: depend
-	STATIC=0 GOOS=linux GOARCH=arm64 LDFLAGS=$(RELEASE_LDFLAGS) common/scripts/gobuild.sh $@ ./istioctl/cmd/istioctl
+	STATIC=0 GOOS=linux GOARCH=arm64 LDFLAGS=$(RELEASE_LDFLAGS) CGO_ENABLED=0 common/scripts/gobuild.sh $@ ./istioctl/cmd/istioctl
 ${ISTIO_OUT}/release/istioctl-osx: depend
 	STATIC=0 GOOS=darwin LDFLAGS=$(RELEASE_LDFLAGS) CGO_ENABLED=0 common/scripts/gobuild.sh $@ ./istioctl/cmd/istioctl
 ${ISTIO_OUT}/release/istioctl-win.exe: depend
