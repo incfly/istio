@@ -264,6 +264,11 @@ func NewController(client kubernetes.Interface, metadataClient metadata.Interfac
 	c.pods = newPodCache(podInformer, c)
 	registerHandlers(podInformer, c.queue, "Pods", c.pods.onEvent)
 
+	// Read the mesh config and update the cluster ID to trust domain mapping.
+	cm, err := client.CoreV1().ConfigMaps("istio-system").Get(context.TODO(), "abc", metav1.GetOptions{})
+	if err != nil {
+		log.Errorf("Failed to read config map, trust domain mapping not updated for %v", c.clusterID)
+	}
 	return c
 }
 

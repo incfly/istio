@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -72,13 +73,15 @@ func GetLocalTrustDomain() string {
 
 func GetTrustDomainByCluster(clusterID string) string {
 	spiffeLog.Infof("jianfeih debug GetTrustDomainByCluster cluster ID %v", clusterID)
+	debug.PrintStack()
 	// jianfeih here, hardcode for POC.
-	if clusterID == "meshca2" {
-		spiffeLog.Infof("jianfeih GetTrustDomainByCluster special case clusterID %v, td jianfeih-10.svc.id.goog")
-		return "jianfeih-10.svc.id.goog"
-	} else if clusterID == "meshca1" {
-		spiffeLog.Infof("jianfeih GetTrustDomainByCluster special case clusterID %v, td jianfeih-test.svc.id.goog")
-		return "jianfeih-test.svc.id.goog"
+	// TODO: jianfeih get both results, istiod-td-0727.log? weird some inconsistency.
+	if strings.Contains(clusterID, "meshca-b2") {
+		spiffeLog.Infof("jianfeih GetTrustDomainByCluster special case clusterID, td jianfeih-b2.svc.id.goog")
+		return "jianfeih-b2.svc.id.goog"
+	} else if strings.Contains(clusterID, "meshca-b1") {
+		spiffeLog.Infof("jianfeih GetTrustDomainByCluster special case clusterID, td jianfeih-b1.svc.id.goog")
+		return "jianfeih-b1.svc.id.goog"
 	}
 	return GetLocalTrustDomain()
 }
