@@ -167,11 +167,11 @@ func (configgen *ConfigGeneratorImpl) buildOutboundClusters(proxy *model.Proxy, 
 		services = push.Services(proxy)
 	}
 	for _, service := range services {
-		if strings.Contains(string(service.Hostname), "hello") ||
-			strings.Contains(string(service.Hostname), "httpbin") {
-			log.Infof("jianfeih buildOutboundClusters sa inspection, host %v, sa %v",
-				service.Hostname, cb.push.ServiceAccounts[service.Hostname])
-		}
+		// if strings.Contains(string(service.Hostname), "hello") ||
+		// 	strings.Contains(string(service.Hostname), "httpbin") {
+		// 	log.Infof("jianfeih buildOutboundClusters sa inspection, host %v, sa %v",
+		// 		service.Hostname, cb.push.ServiceAccounts[service.Hostname])
+		// }
 		for _, port := range service.Ports {
 			if port.Protocol == protocol.UDP {
 				continue

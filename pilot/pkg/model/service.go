@@ -647,21 +647,20 @@ func GetServiceAccounts(svc *Service, ports []int, discovery ServiceDiscovery) [
 		instances = append(instances, svcInstances...)
 	}
 
-	condition := strings.Contains(string(svc.Hostname), "hello") || strings.Contains(string(svc.Hostname), "httpbin")
+	// condition := strings.Contains(string(svc.Hostname), "hello") || strings.Contains(string(svc.Hostname), "httpbin")
 	for _, si := range instances {
 		if si.Endpoint.ServiceAccount != "" {
-			log.Infof("jianfeih here GetServiceAccounts the endpoint %+v", *si.Endpoint)
 			sa.Insert(si.Endpoint.ServiceAccount)
 		}
 
 	}
-	if condition {
-		log.Infof("jianfeih model/GetServiceAccounts p1: %v", sa)
-	}
+	// if condition {
+	// 	log.Infof("jianfeih model/GetServiceAccounts p1: %v", sa)
+	// }
 	sa.Insert(svc.ServiceAccounts...)
-	if condition {
-		log.Infof("jianfeih model/GetServiceAccounts p2: %v", sa)
-	}
+	// if condition {
+	// 	log.Infof("jianfeih model/GetServiceAccounts p2: %v", sa)
+	// }
 	return sa.UnsortedList()
 }
 

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +43,9 @@ var (
 	trustDomain      = defaultTrustDomain
 	trustDomainMutex sync.RWMutex
 
+	// TODO(incfly/myipdt): deprecate trustDomain using this map only.
+	trustDomainInfoMap sync.Map
+
 	firstRetryBackOffTime = time.Millisecond * 50
 	totalRetryTimeout     = time.Second * 10
 
@@ -54,6 +56,12 @@ type bundleDoc struct {
 	jose.JSONWebKeySet
 	Sequence    uint64 `json:"spiffe_sequence,omitempty"`
 	RefreshHint int    `json:"spiffe_refresh_hint,omitempty"`
+}
+
+type ClusterTrustDomainInfo struct {
+	ClusterID          string
+	TrustDomain        string
+	TrustDomainAliases []string
 }
 
 func SetTrustDomain(value string) {
@@ -72,21 +80,29 @@ func GetLocalTrustDomain() string {
 }
 
 func GetTrustDomainByCluster(clusterID string) string {
-	spiffeLog.Infof("jianfeih debug GetTrustDomainByCluster cluster ID %v", clusterID)
-	debug.PrintStack()
-	// jianfeih here, hardcode for POC.
-	// TODO: jianfeih get both results, istiod-td-0727.log? weird some inconsistency.
-	if strings.Contains(clusterID, "meshca-b2") {
-		spiffeLog.Infof("jianfeih GetTrustDomainByCluster special case clusterID, td jianfeih-b2.svc.id.goog")
-		return "jianfeih-b2.svc.id.goog"
-	} else if strings.Contains(clusterID, "meshca-b1") {
-		spiffeLog.Infof("jianfeih GetTrustDomainByCluster special case clusterID, td jianfeih-b1.svc.id.goog")
-		return "jianfeih-b1.svc.id.goog"
+	i, ok := trustDomainInfoMap.Load(clusterID)
+	if ok {
+		return i.(ClusterTrustDomainInfo).TrustDomain
 	}
 	return GetLocalTrustDomain()
 }
 
-func SetTrustDomainByCluster(clusterID string, trustDomain string) {
+func SetTrustDomainByCluster(clusterID string, trustDomain string, aliases []string) {
+	if trustDomain == "" || clusterID == "" {
+		spiffeLog.Errorf("Trust Domain and cluster ID can't be empty, cluster %v, trust domain %v",
+			clusterID, trustDomain)
+		return
+	}
+	trustDomainInfoMap.Store(clusterID, ClusterTrustDomainInfo{
+		ClusterID:          clusterID,
+		TrustDomain:        trustDomain,
+		TrustDomainAliases: aliases,
+	})
+}
+
+// DumpDebugInfo returns the current information related to spiffe.
+func DumpDebugInfo() string {
+	return ""
 }
 
 func DetermineTrustDomain(commandLineTrustDomain string, isKubernetes bool) string {
@@ -111,21 +127,18 @@ func GenSpiffeURI(ns, serviceAccount string) (string, error) {
 
 // MustGenSpiffeURI returns the formatted uri(SPIFFE format for now) for the certificate and logs if there was an error.
 func MustGenSpiffeURI(trustDomain, ns, serviceAccount string) string {
-	if ns == "" {
-		return GenCustomSpiffe(trustDomain, serviceAccount)
+	uri, err := GenSpiffeURI(ns, serviceAccount)
+	if err != nil {
+		spiffeLog.Debug(err.Error())
 	}
-	localTD := GetLocalTrustDomain()
-	// jianfeih: just to be safe now...
-	if localTD != trustDomain {
-		return URIPrefix + trustDomain + "/ns/" + ns + "/sa/" + serviceAccount
-	}
-	return URIPrefix + GetLocalTrustDomain() + "/ns/" + ns + "/sa/" + serviceAccount
+	return uri
 }
 
 // GenCustomSpiffe returns the  spiffe string that can have a custom structure
 func GenCustomSpiffe(trustDomain string, identity string) string {
-	if trustDomain == "" || identity == "" {
-		spiffeLog.Errorf("spiffe identity or trust domain  can't be empty, %v, %v", trustDomain, identity)
+	if identity == "" {
+		spiffeLog.Error("spiffe identity can't be empty")
+		return ""
 	}
 
 	return URIPrefix + GetLocalTrustDomain() + "/" + identity

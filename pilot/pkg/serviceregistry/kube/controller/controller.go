@@ -44,6 +44,7 @@ import (
 	"istio.io/pkg/log"
 	"istio.io/pkg/monitoring"
 
+	meshconfig "istio.io/api/mesh/v1alpha1"
 	"istio.io/istio/pilot/pkg/gcpmonitoring"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/util"
@@ -53,6 +54,8 @@ import (
 	"istio.io/istio/pkg/config/labels"
 	"istio.io/istio/pkg/config/mesh"
 	"istio.io/istio/pkg/queue"
+	"istio.io/istio/pkg/spiffe"
+	"istio.io/istio/pkg/util/gogoprotomarshal"
 )
 
 const (
@@ -265,9 +268,16 @@ func NewController(client kubernetes.Interface, metadataClient metadata.Interfac
 	registerHandlers(podInformer, c.queue, "Pods", c.pods.onEvent)
 
 	// Read the mesh config and update the cluster ID to trust domain mapping.
-	cm, err := client.CoreV1().ConfigMaps("istio-system").Get(context.TODO(), "abc", metav1.GetOptions{})
+	cm, err := client.CoreV1().ConfigMaps("istio-system").Get(context.TODO(), "istio", metav1.GetOptions{})
 	if err != nil {
-		log.Errorf("Failed to read config map, trust domain mapping not updated for %v", c.clusterID)
+		log.Errorf("Failed to read config map, trust domain mapping not updated for %v: %v", c.clusterID, err)
+	}
+	v := cm.Data["mesh"]
+	mesh := meshconfig.MeshConfig{}
+	if err := gogoprotomarshal.ApplyYAML(v, &mesh); err != nil {
+		log.Errorf("Failed to deserialize mesh config from YAML: %v for %v", err, c.clusterID)
+	} else {
+		spiffe.SetTrustDomainByCluster(c.clusterID, mesh.TrustDomain, mesh.TrustDomainAliases)
 	}
 	return c
 }
