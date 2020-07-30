@@ -73,7 +73,6 @@ func SetTrustDomain(value string) {
 	trustDomainMutex.Unlock()
 }
 
-// jianfeih here, swap the calling to GetTrustDomainByCluster later with an empty cluster ID.
 func GetLocalTrustDomain() string {
 	trustDomainMutex.RLock()
 	defer trustDomainMutex.RUnlock()

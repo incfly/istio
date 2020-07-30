@@ -128,12 +128,6 @@ func convertServices(cfg model.Config) []*model.Service {
 			})
 		}
 	}
-	// for _, svc := range out {
-	// 	condition := strings.Contains(string(svc.Hostname), "hello") || strings.Contains(string(svc.Hostname), "httpbin")
-	// 	if condition {
-	// 		log.Infof("jianfeih service entry conversion, host name %v, sa %v", svc.Hostname, svc.ServiceAccounts)
-	// 	}
-	// }
 	return out
 }
 

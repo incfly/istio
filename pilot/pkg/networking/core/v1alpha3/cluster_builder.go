@@ -66,11 +66,6 @@ func (cb *ClusterBuilder) applyDestinationRule(proxy *model.Proxy, cluster *apiv
 	}
 
 	if clusterMode == DefaultClusterMode {
-		// if strings.Contains(string(service.Hostname), "hello") ||
-		// 	strings.Contains(string(service.Hostname), "httpbin") {
-		// 	log.Infof("jianfeih applyDestinationRule host %v, sa %v",
-		// 		service.Hostname, cb.push.ServiceAccounts[service.Hostname][port.Port])
-		// }
 		opts.serviceAccounts = cb.push.ServiceAccounts[service.Hostname][port.Port]
 		opts.istioMtlsSni = model.BuildDNSSrvSubsetKey(model.TrafficDirectionOutbound, "", service.Hostname, port.Port)
 		opts.simpleTLSSni = string(service.Hostname)

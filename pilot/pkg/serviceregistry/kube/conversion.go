@@ -117,11 +117,6 @@ func ConvertService(svc coreV1.Service, domainSuffix string, clusterID string) *
 		},
 	}
 
-	// condition := strings.Contains(string(istioService.Hostname), "hello") || strings.Contains(string(istioService.Hostname), "httpbin")
-	// if condition {
-	// 	log.Infof("jianfeih kube/conversion.go host %v, sa %v", istioService.Hostname, serviceaccounts)
-	// }
-
 	switch svc.Spec.Type {
 	case coreV1.ServiceTypeNodePort:
 		if _, ok := svc.Annotations[NodeSelectorAnnotation]; ok {

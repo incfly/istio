@@ -654,13 +654,7 @@ func GetServiceAccounts(svc *Service, ports []int, discovery ServiceDiscovery) [
 		}
 
 	}
-	// if condition {
-	// 	log.Infof("jianfeih model/GetServiceAccounts p1: %v", sa)
-	// }
 	sa.Insert(svc.ServiceAccounts...)
-	// if condition {
-	// 	log.Infof("jianfeih model/GetServiceAccounts p2: %v", sa)
-	// }
 	return sa.UnsortedList()
 }
 
