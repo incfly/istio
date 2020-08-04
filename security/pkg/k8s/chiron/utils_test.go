@@ -332,7 +332,7 @@ func TestSubmitCSR(t *testing.T) {
 			continue
 		}
 
-		csrName := fmt.Sprintf("domain-%s-ns-%s-secret-%s", spiffe.GetTrustDomain(), tc.secretNameSpace, tc.secretName)
+		csrName := fmt.Sprintf("domain-%s-ns-%s-secret-%s", spiffe.GetLocalTrustDomain(), tc.secretNameSpace, tc.secretName)
 		numRetries := 3
 		csrPEM := "fake-csr"
 
@@ -448,8 +448,14 @@ func TestReadSignedCertificate(t *testing.T) {
 		}
 
 		// 4. Read the signed certificate
+<<<<<<< HEAD
 		csrName := fmt.Sprintf("domain-%s-ns-%s-secret-%s", spiffe.GetTrustDomain(), tc.secretNameSpace, tc.secretName)
 		_, _, err = readSignedCertificate(wc.certClient.CertificateSigningRequests(), csrName, certReadInterval, maxNumCertRead, wc.k8sCaCertFile)
+=======
+		csrName := fmt.Sprintf("domain-%s-ns-%s-secret-%s", spiffe.GetLocalTrustDomain(), tc.secretNameSpace, tc.secretName)
+		_, _, err = readSignedCertificate(wc.certClient.CertificateSigningRequests(), csrName,
+			certReadInterval, certWatchTimeout, maxNumCertRead, wc.k8sCaCertFile)
+>>>>>>> c4ae5e80f4... get local trust domain refactor done.
 
 		if tc.expectFail {
 			if err == nil {

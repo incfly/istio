@@ -14,10 +14,6 @@
 
 package envoy
 
-import (
-	"istio.io/istio/pkg/spiffe"
-)
-
 const (
 	// Service accounts for Mixer and Pilot, these are hardcoded values at setup time
 	PilotSvcAccName string = "istio-pilot-service-account"
@@ -25,11 +21,11 @@ const (
 	MixerSvcAccName string = "istio-mixer-service-account"
 )
 
-// GetPilotSAN returns the SAN used for pilot mTLS
-func GetSAN(ns string, identity string) string {
+// // GetPilotSAN returns the SAN used for pilot mTLS
+// func GetSAN(ns string, identity string) string {
 
-	if ns != "" {
-		return spiffe.MustGenSpiffeURI(ns, identity)
-	}
-	return spiffe.GenCustomSpiffe(identity)
-}
+// 	if ns != "" {
+// 		return spiffe.MustGenSpiffeURI(ns, identity)
+// 	}
+// 	return spiffe.GenCustomSpiffe(identity)
+// }

@@ -255,6 +255,11 @@ func incrementLDSPush() {
 	gcpmonitoring.IncrementConfigPushMeasuare("LDS", true)
 }
 
+func recordProxyClients(num int) {
+	xdsClients.Record(float64(num))
+	gcpmonitoring.RecordXdsClients(num)
+}
+
 func recordConvergencyDeley(latency float64) {
 	proxiesConvergeDelay.Record(latency)
 	gcpmonitoring.RecordPilotConfigConvergence(latency)

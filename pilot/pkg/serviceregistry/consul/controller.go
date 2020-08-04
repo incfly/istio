@@ -246,7 +246,7 @@ func (c *Controller) GetIstioServiceAccounts(svc *model.Service, ports []int) []
 	// Follow - https://goo.gl/Dt11Ct
 
 	return []string{
-		spiffe.MustGenSpiffeURI("default", "default"),
+		spiffe.MustGenSpiffeURI(spiffe.GetLocalTrustDomain(), "default", "default"),
 	}
 }
 

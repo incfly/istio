@@ -835,6 +835,8 @@ func (s *DiscoveryServer) removeCon(conID string) {
 		delete(s.adsClients, conID)
 		recordXDSClients(con.node.Metadata.IstioVersion, -1)
 	}
+
+	recordProxyClients(len(s.adsClients))
 	if s.StatusReporter != nil {
 		go s.StatusReporter.RegisterDisconnect(conID, []string{ClusterType, ListenerType, RouteType, EndpointType})
 	}
