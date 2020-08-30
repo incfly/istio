@@ -115,6 +115,20 @@ func (s *Server) initConfigController(args *PilotArgs) error {
 	}
 	s.configController = aggregateConfigController
 
+	// TODO(incfly): example of how to use config store.
+	// gkv := resource.GroupVersionKind{
+	// 	Group:   "rbac.authorization.k8s.io",
+	// 	Version: "v1",
+	// 	Kind:    "ClusterRole",
+	// }
+	// result, err := s.configController.List(gkv, "")
+
+	// log.Infof("incfly demo clusterrole, type %v\nlist the result is %v %v", gkv, result, err)
+
+	// $GOPATH/pkg/mod/istio.io/client-go@v0.0.0-20200812230733-f5504d568313/pkg/clientset/versioned/typed/security/v1beta1/peerauthentication.gen.go
+	res, e := s.kubeClient.REST().Get().RequestURI("/apis/security.istio.io/v1beta1/peerauthentications").Do(context.TODO()).Raw()
+	log.Infof("incfly demo rest %v, %v", string(res), e)
+
 	// Create the config store.
 	s.environment.IstioConfigStore = model.MakeIstioStore(s.configController)
 

@@ -258,7 +258,7 @@ resources:
     clusterScoped: true
     proto: "k8s.io.api.core.v1.NamespaceSpec"
     protoPackage: "k8s.io/api/core/v1"
-
+  
   - kind: "Node"
     plural: "nodes"
     version: "v1"
